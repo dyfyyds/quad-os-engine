@@ -1,0 +1,19 @@
+# Web 框架
+fastapi==0.115.9
+uvicorn[standard]==0.34.2
+
+# 数据校验
+pydantic==2.11.2
+
+# 数据库（MySQL，SQLAlchemy 2.0 async）
+sqlalchemy==2.0.40
+aiomysql==0.2.0
+pymysql==1.1.1
+cryptography==44.0.3
+
+# 报告导出
+markdown==3.8
+
+# 测试
+pytest==8.3.5
+httpx==0.28.1

@@ -1,0 +1,57 @@
+/* Quad-OS 综合模拟平台 · 浅色企业主题（参照智能设备管理平台风格） */
+:root {
+  /* Element Plus 主色 → 青绿 */
+  --el-color-primary: #15a98a;
+  --el-color-primary-light-3: #45bda3;
+  --el-color-primary-light-5: #7fd0bd;
+  --el-color-primary-light-7: #b2e1d6;
+  --el-color-primary-light-8: #cceae3;
+  --el-color-primary-light-9: #e6f5f1;
+  --el-color-primary-dark-2: #118a70;
+
+  /* 平台 token */
+  --qos-bg: #eef2f6;
+  --qos-card: #ffffff;
+  --qos-border: #e6ebf1;
+  --qos-text: #1f2a37;
+  --qos-muted: #8a96a6;
+  --qos-accent: #15a98a;
+  --qos-accent-soft: #e6f5f1;
+  --qos-sider: #ffffff;
+  --qos-sider-active: #e6f5f1;
+
+  --qos-blue: #3b82f6;
+  --qos-amber: #f0a020;
+  --qos-red: #e64a45;
+  --qos-purple: #8b5cf6;
+
+  --qos-radius: 10px;
+  --qos-shadow: 0 1px 3px rgba(18, 38, 63, 0.06);
+}
+
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+body {
+  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  background: var(--qos-bg);
+  color: var(--qos-text);
+  font-size: 14px;
+}
+
+/* 通用页面/面板 */
+.qos-page { padding: 16px; }
+.qos-page-head { margin-bottom: 14px; }
+.qos-page-title { font-size: 18px; font-weight: 600; margin: 0; }
+.qos-page-sub { font-size: 12px; color: var(--qos-muted); margin: 4px 0 0; }
+
+.qos-grid { display: grid; gap: 14px; }
+.qos-row { display: flex; gap: 14px; flex-wrap: wrap; }
+
+/* 滚动条细化 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #cdd6e0; border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* 让 Element 卡片更贴企业风 */
+.el-card { border-color: var(--qos-border); border-radius: var(--qos-radius); }
+.el-table th.el-table__cell { background: #f5f8fa; color: #5b6776; font-weight: 500; }

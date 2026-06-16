@@ -1,0 +1,18 @@
+# ============================================================
+#  Quad-OS 综合 OS 模拟平台 · 前端脚手架整包（mock 驱动，不含算法逻辑）
+#  一键启动：  docker compose up -d --build
+#  访问：      http://localhost:8088
+#
+#  纯前端单服务：Vue 脚手架经多阶段构建后由 Nginx 托管，全部数据由
+#  浏览器内 mock 驱动产生，无需后端 / 数据库。
+#  （接入真实算法逻辑后改用 docker-compose.full.yml）
+# ============================================================
+
+services:
+
+  web:
+    build: ./frontend
+    container_name: quados-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8088}:80"
