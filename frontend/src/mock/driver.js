@@ -1,4 +1,5 @@
 import { useOsStore } from '../store/os'
+import { api } from '../api/client'
 
 /**
  * Mock 驱动 —— 按虚拟时钟推进，向中央 store 写入「连贯」的 OS 运行叙事，
@@ -12,6 +13,7 @@ import { useOsStore } from '../store/os'
  * 保持对 store 字段的写入契约不变即可（详见 docs/接口契约.md）。
  */
 let timer = null
+let pagingPreparePromise = null
 const rand = (a, b) => a + Math.random() * (b - a)
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
 
@@ -119,6 +121,41 @@ function accessPage(os) {
   os.pushEvent('缺页中断', 'memory', 'warning', `访问页 ${page} 缺页 —— ${detail}`)
 }
 
+function replayPagingTrace(os) {
+  const trace = os.memory.pagingTrace
+  const next = os.memory.traceCursor + 1
+  if (!trace?.steps?.length || next >= trace.steps.length) {
+    if (os.memory.backendMode === 'backend') {
+      os.memory.backendMode = 'local'
+      os.memory.backendError = '后端分页 trace 已播放完，当前继续使用 local mock'
+    }
+    accessPage(os)
+    return
+  }
+  os.applyPagingStep(next)
+}
+
+async function preparePagingTrace(os) {
+  if (os.memory.backendMode === 'backend' && os.memory.pagingTrace) return
+  if (pagingPreparePromise) return pagingPreparePromise
+
+  pagingPreparePromise = (async () => {
+    try {
+      const trace = await api.paging({
+        algorithm: os.config.pageAlgo,
+        reference_string: os.memory.refString,
+        frames: os.memory.frameCount || os.memory.capacity,
+      })
+      os.setPagingTrace(trace)
+    } catch (e) {
+      os.clearPagingTrace(e?.message || '后端分页引擎不可用')
+    } finally {
+      pagingPreparePromise = null
+    }
+  })()
+  return pagingPreparePromise
+}
+
 // ———————————————————————— 设备：磁盘驱动调度（移臂 + 旋转）————————————————————————
 function chooseDiskRequest(d, algo) {
   const q = d.queue
@@ -211,7 +248,10 @@ function tick(os) {
   }
 
   // —— 存储：访存与缺页置换 ——
-  if (running && Math.random() < 0.7) accessPage(os)
+  if (running && Math.random() < 0.7) {
+    if (os.memory.backendMode === 'backend') replayPagingTrace(os)
+    else accessPage(os)
+  }
 
   // —— 新作业到达 ——
   if (t % 7 === 0) {
@@ -281,9 +321,17 @@ export function useOsDriver() {
     if (timer) clearInterval(timer)
     timer = setInterval(() => tick(os), Math.max(120, 900 / os.speed))
   }
-  function start() { if (os.running) return; os.running = true; schedule() }
+  async function start() {
+    if (os.running) return
+    await preparePagingTrace(os)
+    os.running = true
+    schedule()
+  }
   function pause() { os.running = false; if (timer) { clearInterval(timer); timer = null } }
-  function step() { tick(os) }
+  async function step() {
+    if (os.memory.traceCursor < 0 && !os.memory.backendError) await preparePagingTrace(os)
+    tick(os)
+  }
   function setSpeed(s) { os.speed = s; if (os.running) schedule() }
   function reset() { pause(); os.resetState() }
 
