@@ -21,6 +21,8 @@ async function get(path) {
 export const api = {
   scheduling: (b) => post('/api/scheduling/run', b),
   disk: (b) => post('/api/disk/run', b),
+  diskSimulate: (b) => post('/api/disk/simulate', b),
+  diskBenchmark: (b) => post('/api/disk/benchmark', b),
   paging: (b) => post('/api/paging/run', b),
   pagingTranslate: (b) => post('/api/paging/translate', b),
   bankerSafety: (b) => post('/api/banker/safety', b),

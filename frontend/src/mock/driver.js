@@ -2,17 +2,17 @@ import { useOsStore } from '../store/os'
 import { api } from '../api/client'
 
 /**
- * Mock 驱动 —— 按虚拟时钟推进，向中央 store 写入「连贯」的 OS 运行叙事，
+ * 驱动 —— 按虚拟时钟推进，向中央 store 写入「连贯」的 OS 运行叙事，
  * 让总览大屏与各核心页彼此联动地「活」起来。
  *
- * 存储置换（FIFO/LRU/OPT/CLOCK）与磁盘驱动调度（FCFS/SSTF/SCAN/LOOK/C-SCAN/C-LOOK）
- * 均按 os.config 的算法选择真实分支执行，切换算法即刻改变行为。
+ * 磁盘调度已接入真实后端引擎（backend/app/engines/disk_engine），
+ * 支持 FCFS/SSTF/SCAN/C-SCAN/LOOK/C-LOOK/F-SCAN/N-SCAN 八种移臂算法 + 旋转调度。
  *
- * ⚠️ TODO(team): 本驱动为脚手架占位。团队接入真实逻辑时，用对
- * backend/app/engines/* 的真实编排替换 tick() 内的 mock 变更，
- * 保持对 store 字段的写入契约不变即可（详见 docs/接口契约.md）。
+ * ⚠️ TODO(team): 处理机/存储/资源核心仍为 mock，
+ * 待各团队接入真实引擎后替换对应段。
  */
 let timer = null
+let diskBusy = false  // 防止并发调用后端
 let ticking = false
 let cpuTrace = null
 let cpuTraceKey = ''
@@ -326,48 +326,93 @@ function accessPage(os) {
   os.pushEvent('缺页中断', 'memory', 'warning', `访问页 ${page} 缺页 —— ${detail}`)
 }
 
-// ———————————————————————— 设备：磁盘驱动调度（移臂 + 旋转）————————————————————————
-function chooseDiskRequest(d, algo) {
-  const q = d.queue
-  if (algo === 'FCFS') return 0
-  if (algo === 'SSTF') {
-    let bi = 0, bd = Infinity
-    q.forEach((r, i) => { const dist = Math.abs(r.柱面号 - d.head); if (dist < bd) { bd = dist; bi = i } })
-    return bi
-  }
-  // SCAN / LOOK / C-SCAN / C-LOOK —— 沿当前方向取最近柱面，本方向无请求则换向
-  const nearestIn = (dir) => {
-    let bi = -1, bd = Infinity
-    q.forEach((r, i) => {
-      const ahead = dir > 0 ? r.柱面号 >= d.head : r.柱面号 <= d.head
-      if (ahead) { const dist = Math.abs(r.柱面号 - d.head); if (dist < bd) { bd = dist; bi = i } }
+// ———————————————————————— 设备：磁盘驱动调度（接入真实后端引擎）————————————————————————
+
+/**
+ * 接入后端 /api/disk/simulate 进行完整 I/O 模拟（移臂 + 旋转 + 传输）。
+ * 后端引擎支持 FCFS/SSTF/SCAN/C-SCAN/LOOK/C-LOOK/F-SCAN/N-SCAN 八种算法。
+ */
+async function serveDisk(os) {
+  if (diskBusy) return  // 防止并发
+  const d = os.disk
+  if (!d.queue.length) return
+
+  diskBusy = true
+  try {
+    const trace = await api.diskSimulate({
+      algorithm: os.config.diskAlgo,
+      io_requests: d.queue,
+      head: d.head,
+      current_record: d.currentRecord,
+      geometry: {
+        cylinders: d.cylinders,
+        tracks_per_cylinder: d.tracksPerCyl,
+        records_per_track: d.recordsPerTrack,
+      },
+      direction: d.direction > 0 ? 'up' : 'down',
     })
-    return bi
+
+    // 用引擎返回的第一步结果更新 store
+    if (trace.steps && trace.steps.length > 0) {
+      const first = trace.steps[0]
+      const st = first.state
+      const seek = st['寻道距离']
+      const servedName = st['进程名']
+
+      // 更新磁头位置
+      d.head = st['目标柱面']
+      d.currentRecord = st['目标记录']
+      d.totalSeek += seek
+      if (d.head !== trace.input_echo.head) {
+        d.direction = d.head > trace.input_echo.head ? 1 : -1
+      }
+      d.path.push(d.head)
+      if (d.path.length > 30) d.path.shift()
+
+      // 从队列移除已服务请求
+      const idx = d.queue.findIndex(r => r.进程名 === servedName)
+      if (idx >= 0) {
+        const req = d.queue.splice(idx, 1)[0]
+        d.served++
+        d.servedLog.unshift({ ...req, 寻道: seek, ts: os.clock })
+        if (d.servedLog.length > 8) d.servedLog.pop()
+      }
+
+      os.pushEvent('驱动调度', 'device', 'info',
+        `${servedName}：移臂至柱面 ${d.head}(寻道 ${seek}) → 旋转至记录 ${d.currentRecord} (服务时间 ${st['服务时间']})`)
+    }
+  } catch (e) {
+    console.warn('[disk] 后端调用失败，回退本地调度:', e.message)
+    // 回退：本地简单 SSTF
+    serveDiskLocal(os)
+  } finally {
+    diskBusy = false
   }
-  let bi = nearestIn(d.direction)
-  if (bi < 0) { d.direction = -d.direction; bi = nearestIn(d.direction) }
-  return bi < 0 ? 0 : bi
 }
 
-function serveDisk(os) {
+/** 本地回退调度（后端不可用时）。 */
+function serveDiskLocal(os) {
   const d = os.disk
-  const idx = chooseDiskRequest(d, os.config.diskAlgo)
-  const req = d.queue[idx]
+  if (!d.queue.length) return
+  // SSTF 选择最近请求
+  let bi = 0, bd = Infinity
+  d.queue.forEach((r, i) => {
+    const dist = Math.abs(r.柱面号 - d.head)
+    if (dist < bd) { bd = dist; bi = i }
+  })
+  const req = d.queue[bi]
   const seek = Math.abs(req.柱面号 - d.head)
-  if (req.柱面号 !== d.head) d.direction = req.柱面号 > d.head ? 1 : -1
-  // 移臂调度：移动到目标柱面
   d.totalSeek += seek
   d.head = req.柱面号
-  d.path.push(req.柱面号)
-  if (d.path.length > 30) d.path.shift()
-  // 旋转调度：柱面内旋转到目标物理记录
   d.currentRecord = req.物理记录号
-  d.queue.splice(idx, 1)
+  d.path.push(d.head)
+  if (d.path.length > 30) d.path.shift()
+  d.queue.splice(bi, 1)
   d.served++
   d.servedLog.unshift({ ...req, 寻道: seek, ts: os.clock })
   if (d.servedLog.length > 8) d.servedLog.pop()
   os.pushEvent('驱动调度', 'device', 'info',
-    `${req.进程名}：移臂至柱面 ${req.柱面号}(寻道 ${seek}) → 磁道 ${req.磁道号}/旋转至记录 ${req.物理记录号}`)
+    `${req.进程名}：移臂至柱面 ${req.柱面号}(寻道 ${seek}) → 旋转至记录 ${req.物理记录号} [本地]`)
 }
 
 function makeRequest(os) {
@@ -415,8 +460,8 @@ async function tick(os) {
     }
   }
 
-  // —— 设备：磁盘驱动调度 ——
-  if (os.disk.queue.length && t % 2 === 0) serveDisk(os)
+  // —— 设备：磁盘驱动调度（异步调用后端，不阻塞主时钟）——
+  if (os.disk.queue.length && t % 2 === 0) serveDisk(os)  // fire-and-forget
   if (os.disk.queue.length < 6 && t % 6 === 0) {
     const req = makeRequest(os)
     os.disk.queue.push(req)
