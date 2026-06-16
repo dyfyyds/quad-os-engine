@@ -22,6 +22,12 @@ JOBS = [
 def test_fcfs():
     t = scheduling_engine.run("FCFS", JOBS)
     assert t.final_state["完成顺序"] == ["A", "B", "C", "D"]
+    assert t.final_state["甘特图"] == [
+        {"作业": "A", "开始": 0, "结束": 4},
+        {"作业": "B", "开始": 4, "结束": 7},
+        {"作业": "C", "开始": 7, "结束": 12},
+        {"作业": "D", "开始": 12, "结束": 14},
+    ]
     assert t.metrics["平均周转时间"] == 7.75
     assert t.metrics["平均等待时间"] == 4.25
 
@@ -29,18 +35,37 @@ def test_fcfs():
 def test_sjf():
     t = scheduling_engine.run("SJF", JOBS)
     assert t.final_state["完成顺序"] == ["A", "D", "B", "C"]
+    assert t.final_state["甘特图"] == [
+        {"作业": "A", "开始": 0, "结束": 4},
+        {"作业": "D", "开始": 4, "结束": 6},
+        {"作业": "B", "开始": 6, "结束": 9},
+        {"作业": "C", "开始": 9, "结束": 14},
+    ]
     assert t.metrics["平均周转时间"] == 6.75
 
 
 def test_hrrn():
     t = scheduling_engine.run("HRRN", JOBS)
     assert t.final_state["完成顺序"] == ["A", "B", "D", "C"]
+    assert t.final_state["甘特图"] == [
+        {"作业": "A", "开始": 0, "结束": 4},
+        {"作业": "B", "开始": 4, "结束": 7},
+        {"作业": "D", "开始": 7, "结束": 9},
+        {"作业": "C", "开始": 9, "结束": 14},
+    ]
     assert t.metrics["平均周转时间"] == 7.0
 
 
 def test_priority_nonpreemptive():
     t = scheduling_engine.run("PRIORITY", JOBS)
     assert t.final_state["完成顺序"] == ["A", "B", "D", "C"]
+    assert t.final_state["甘特图"] == [
+        {"作业": "A", "开始": 0, "结束": 4},
+        {"作业": "B", "开始": 4, "结束": 7},
+        {"作业": "D", "开始": 7, "结束": 9},
+        {"作业": "C", "开始": 9, "结束": 14},
+    ]
+    assert t.metrics["平均周转时间"] == 7.0
 
 
 def test_round_robin():
@@ -51,6 +76,14 @@ def test_round_robin():
     ]
     t = scheduling_engine.run("RR", jobs, time_quantum=2)
     assert t.final_state["完成顺序"] == ["A", "B", "C"]
+    assert t.final_state["甘特图"] == [
+        {"作业": "A", "开始": 0, "结束": 2},
+        {"作业": "B", "开始": 2, "结束": 4},
+        {"作业": "C", "开始": 4, "结束": 6},
+        {"作业": "A", "开始": 6, "结束": 8},
+        {"作业": "B", "开始": 8, "结束": 9},
+        {"作业": "C", "开始": 9, "结束": 10},
+    ]
     assert t.metrics["平均周转时间"] == 9.0
 
 
