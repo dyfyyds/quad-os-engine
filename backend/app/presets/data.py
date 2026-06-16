@@ -39,11 +39,33 @@ PRESETS: dict[str, list[dict]] = {
     "disk": [
         {
             "name": "经典磁头序列（初始 53）",
-            "description": "请求 98,183,37,122,14,124,65,67；磁道 0~199；初始递增",
+            "description": "Silberschatz 教材经典示例：请求 98,183,37,122,14,124,65,67；磁道 0~199；初始递增",
             "input": {
                 "algorithm": "SCAN",
                 "requests": [98, 183, 37, 122, 14, 124, 65, 67],
                 "head": 53,
+                "disk_size": 200,
+                "direction": "up",
+            },
+        },
+        {
+            "name": "密集请求序列（初始 100）",
+            "description": "请求 55,58,39,18,90,160,150,38,184；柱面 0~199；可对比所有算法差异",
+            "input": {
+                "algorithm": "SSTF",
+                "requests": [55, 58, 39, 18, 90, 160, 150, 38, 184],
+                "head": 100,
+                "disk_size": 200,
+                "direction": "down",
+            },
+        },
+        {
+            "name": "单方向聚集请求",
+            "description": "请求全在磁头右侧：150,160,170,180,190；适合展示 LOOK/C-LOOK 优化",
+            "input": {
+                "algorithm": "LOOK",
+                "requests": [150, 160, 170, 180, 190],
+                "head": 50,
                 "disk_size": 200,
                 "direction": "up",
             },
