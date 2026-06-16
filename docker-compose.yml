@@ -1,18 +1,82 @@
 # ============================================================
-#  Quad-OS 综合 OS 模拟平台 · 前端脚手架整包（mock 驱动，不含算法逻辑）
-#  一键启动：  docker compose up -d --build
-#  访问：      http://localhost:8088
+#  Quad-OS 综合 OS 模拟平台 · 完整栈
+#  服务：mysql + backend(FastAPI) + frontend(Vue→Nginx) + nginx(反代)
+#  启动：docker compose up -d --build
+#  访问：http://localhost:8088
 #
-#  纯前端单服务：Vue 脚手架经多阶段构建后由 Nginx 托管，全部数据由
-#  浏览器内 mock 驱动产生，无需后端 / 数据库。
-#  （接入真实算法逻辑后改用 docker-compose.full.yml）
+#  注：前端当前为 mock 驱动，后端服务已部署但暂未接入。
+#      接入真实算法逻辑后前端切换 API 地址即可。
 # ============================================================
 
 services:
 
-  web:
+  mysql:
+    image: mysql:8.0
+    container_name: quados-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-quad_os}
+      MYSQL_USER: ${MYSQL_USER:-quados}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-quados}
+      TZ: Asia/Shanghai
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [quados-net]
+
+  backend:
+    build: ./backend
+    container_name: quados-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: mysql+aiomysql://${MYSQL_USER:-quados}:${MYSQL_PASSWORD:-quados}@mysql:3306/${MYSQL_DATABASE:-quad_os}?charset=utf8mb4
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/api/health').status==200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: [quados-net]
+
+  frontend:
     build: ./frontend
-    container_name: quados-web
+    container_name: quados-frontend
+    restart: unless-stopped
+    networks: [quados-net]
+
+  nginx:
+    image: nginx:alpine
+    container_name: quados-nginx
     restart: unless-stopped
     ports:
-      - "${WEB_PORT:-8088}:80"
+      - "${NGINX_PORT:-8088}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks: [quados-net]
+
+volumes:
+  mysql-data:
+
+networks:
+  quados-net:
+    driver: bridge
