@@ -2,7 +2,7 @@
   <div class="qos-page">
     <div class="qos-page-head">
       <h2 class="qos-page-title">设备管理核心 · 磁盘驱动调度</h2>
-      <p class="qos-page-sub">移臂调度（按柱面号） + 旋转调度（按物理记录号） · 真实盘面几何 —— 当前算法：{{ os.config.diskAlgo }}（mock）</p>
+      <p class="qos-page-sub">移臂调度（按柱面号） + 旋转调度（按物理记录号） · 真实盘面几何 —— 当前算法：{{ os.config.diskAlgo }}（驱动调度引擎）</p>
     </div>
 
     <el-row :gutter="14" style="margin-bottom: 14px;">

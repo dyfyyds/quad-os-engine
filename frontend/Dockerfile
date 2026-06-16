@@ -1,7 +1,8 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --no-audit --no-fund
+# 国内网络：使用 npmmirror 镜像源，避免 registry.npmjs.org 连接重置（ECONNRESET）
+RUN npm config set registry https://registry.npmmirror.com && npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 

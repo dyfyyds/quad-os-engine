@@ -5,11 +5,14 @@ import { api } from '../api/client'
  * 驱动 —— 按虚拟时钟推进，向中央 store 写入「连贯」的 OS 运行叙事，
  * 让总览大屏与各核心页彼此联动地「活」起来。
  *
- * 磁盘调度已接入真实后端引擎（backend/app/engines/disk_engine），
- * 支持 FCFS/SSTF/SCAN/C-SCAN/LOOK/C-LOOK/F-SCAN/N-SCAN 八种移臂算法 + 旋转调度。
- *
- * ⚠️ TODO(team): 处理机/存储/资源核心仍为 mock，
- * 待各团队接入真实引擎后替换对应段。
+ * 六大模块均已接入后端引擎语义（backend/app/engines/*），且因果联动：
+ *   · 处理机  /api/scheduling/run  一次性 trace + 逐周期回放
+ *   · 存储    /api/paging/run      置换 trace 回放（FIFO/LRU/OPT/CLOCK）+ 地址转换（页号×块长+单元号→绝对地址/缺页）
+ *   · 设备    /api/disk/simulate   移臂 + 旋转 I/O 模拟
+ *   · 资源    /api/banker/*        安全性 + 资源请求/释放
+ *   · 同步    sync_engine 语义     PV 生产者-消费者（进程驱动，阻塞/唤醒）
+ * 「调度器选中的运行进程」是共同的因：它驱动访存/地址转换、磁盘 I/O、资源请求与同步生产。
+ * 后端不可用时自动回退前端等价算法（一次性告警），保证纯前端可独立运行。
  */
 let timer = null
 let diskBusy = false  // 防止并发调用后端
@@ -19,6 +22,14 @@ let cpuTraceKey = ''
 let cpuTracePromise = null
 let lastCpuRunning = null
 let cpuFallbackNotified = false
+// —— 存储：分页置换 trace（同 CPU：一次取、逐周期回放）——
+let memTrace = null
+let memTraceKey = ''
+let memTracePromise = null
+let memFallbackNotified = false
+// —— 资源：银行家 ——
+let bankerBusy = false
+let bankerFallbackNotified = false
 const rand = (a, b) => a + Math.random() * (b - a)
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
 
@@ -236,94 +247,195 @@ function applyCpuTrace(os) {
   return os.processes.find((p) => p.state === '运行') || null
 }
 
+// CPU 运行期触发一次访存 —— 回放后端分页引擎的下一步（CPU → 存储 因果联动）
 function onCpuMemoryAccess(os, runningProc) {
-  // 预留：后续在这里调用 /api/paging/run 或回放分页 trace，并把缺页写回 os.memory。
+  applyMemoryStep(os)
 }
 
+// CPU 运行期发起一次磁盘 I/O —— 请求挂上当前运行进程名（CPU → 设备 因果联动）
 function onCpuDiskRequest(os, runningProc) {
-  // 预留：后续在这里生成磁盘 I/O 请求，并交给 /api/disk/simulate 或设备队列。
+  const d = os.disk
+  if (d.queue.length >= 8) return
+  const req = makeRequest(os)
+  if (runningProc) req.进程名 = runningProc.name
+  d.queue.push(req)
+  os.pushEvent('I/O请求', 'device', 'info',
+    `${req.进程名} 发起 I/O：柱面 ${req.柱面号}/磁道 ${req.磁道号}/记录 ${req.物理记录号}`)
 }
 
-// ———————————————————————— 存储：缺页置换的淘汰块选择 ————————————————————————
-function chooseVictim(os) {
-  const m = os.memory
-  const occupied = m.frames.map((pg, idx) => ({ pg, idx })).filter((o) => o.pg !== null)
+// ———————————————————————— 存储：分页置换（接入后端引擎）————————————————————————
 
-  switch (os.config.pageAlgo) {
-    case 'FIFO':
-      return occupied.reduce((a, b) => (m.pageTable[a.pg].loadTime <= m.pageTable[b.pg].loadTime ? a : b)).idx
-    case 'OPT': {
-      const ref = m.refString, L = ref.length
-      // 从下一次访问起向后看一圈，淘汰「最久不再被使用」的驻留页
-      const nextUse = (pg) => {
-        for (let k = 0; k < L; k++) if (ref[(m.refPtr + k) % L] === pg) return k
-        return Infinity
+function memKey(os) {
+  return JSON.stringify({
+    algorithm: os.config.pageAlgo,
+    refs: os.memory.refString,
+    frames: os.memory.frameCount,
+  })
+}
+
+/**
+ * 取后端分页 trace（FIFO/LRU/OPT/CLOCK），按 key 缓存；
+ * 后端不可用时回退本地等价算法（与 CPU 的 prepareCpuTrace 同范式）。
+ */
+async function prepareMemoryTrace(os) {
+  const key = memKey(os)
+  if (memTrace && key === memTraceKey) return memTrace
+  if (memTracePromise) return memTracePromise
+
+  memTracePromise = (async () => {
+    try {
+      memTrace = await api.paging({
+        algorithm: os.config.pageAlgo,
+        reference_string: os.memory.refString,
+        frames: os.memory.frameCount,
+      })
+      memTraceKey = key
+      memFallbackNotified = false
+    } catch (e) {
+      memTrace = localPagingTrace(os)
+      memTraceKey = key
+      if (!memFallbackNotified) {
+        os.pushEvent('分页回退', 'memory', 'warning', `后端分页接口不可用，临时使用前端等价算法：${e?.message || e}`)
+        memFallbackNotified = true
       }
-      let best = occupied[0].idx, far = -1
-      for (const o of occupied) {
-        const d = nextUse(o.pg)
-        if (d > far) { far = d; best = o.idx }
-      }
-      return best
+    } finally {
+      memTracePromise = null
     }
-    case 'CLOCK': {
-      const n = m.frames.length
-      for (let guard = 0; guard < n * 2; guard++) {
-        const ptr = m.clockPtr % n
-        const pg = m.frames[ptr]
-        if (pg === null || m.pageTable[pg].访问位 === 0) { m.clockPtr = (ptr + 1) % n; return ptr }
-        m.pageTable[pg].访问位 = 0          // 给第二次机会，清访问位后前移
-        m.clockPtr = (ptr + 1) % n
+    return memTrace
+  })()
+
+  return memTracePromise
+}
+
+/** 本地回退：JS 端忠实复刻 paging_engine.run，产出与后端同形的 steps[]。 */
+function localPagingTrace(os) {
+  const algo = (os.config.pageAlgo || 'LRU').toUpperCase()
+  const refs = os.memory.refString
+  const n = os.memory.frameCount
+  const mem = []
+  const insertTime = {}
+  const lastUsed = {}
+  const useBit = {}
+  let hand = 0
+  const steps = []
+  let faults = 0, hits = 0
+
+  const nextUse = (start, page) => {
+    for (let k = start; k < refs.length; k++) if (refs[k] === page) return k - start
+    return Infinity
+  }
+
+  refs.forEach((page, i) => {
+    const hit = mem.includes(page)
+    let evicted = null
+    if (hit) {
+      hits++
+      lastUsed[page] = i
+      if (algo === 'CLOCK') useBit[page] = 1
+    } else {
+      faults++
+      if (mem.length < n) {
+        mem.push(page)
+        if (algo === 'CLOCK') useBit[page] = 1
+      } else {
+        if (algo === 'FIFO') {
+          evicted = mem.reduce((a, b) => (insertTime[a] <= insertTime[b] ? a : b))
+          mem[mem.indexOf(evicted)] = page
+        } else if (algo === 'OPT') {
+          evicted = mem.reduce((a, b) => (nextUse(i + 1, a) >= nextUse(i + 1, b) ? a : b))
+          mem[mem.indexOf(evicted)] = page
+        } else if (algo === 'CLOCK') {
+          while (useBit[mem[hand]] === 1) { useBit[mem[hand]] = 0; hand = (hand + 1) % n }
+          evicted = mem[hand]; mem[hand] = page; useBit[page] = 1; hand = (hand + 1) % n
+        } else { // LRU
+          evicted = mem.reduce((a, b) => ((lastUsed[a] ?? -1) <= (lastUsed[b] ?? -1) ? a : b))
+          mem[mem.indexOf(evicted)] = page
+        }
+        if (evicted !== null) delete useBit[evicted]
       }
-      return 0
+      insertTime[page] = i
+      lastUsed[page] = i
     }
-    case 'LRU':
-    default:
-      return occupied.reduce((a, b) => (m.pageTable[a.pg].lastUsed <= m.pageTable[b.pg].lastUsed ? a : b)).idx
+    const snapshot = mem.concat(new Array(n).fill(null)).slice(0, n)
+    steps.push({ state: { 引用页: page, 命中: hit, 缺页: !hit, 换出页: evicted, 页框: snapshot, 累计缺页: faults } })
+  })
+
+  return {
+    module: 'paging', algorithm: algo,
+    metrics: { 访问总数: refs.length, 缺页次数: faults, 命中次数: hits },
+    steps,
+    final_state: { 最终页框: mem.concat(new Array(n).fill(null)).slice(0, n), 缺页次数: faults },
   }
 }
 
-// 一次访存：命中则更新访问/修改位；缺页则按算法置换并记录「调出页 / 装入页号」
-function accessPage(os) {
+/**
+ * 回放一步分页 trace —— 以后端的命中/缺页/换出/页框快照为权威，
+ * 在前端层叠加教材位语义（访问位/修改位/外存地址/写回）。
+ */
+function applyMemoryStep(os) {
   const m = os.memory
-  const page = m.refString[m.refPtr % m.refString.length]
+  const trace = memTrace
+  if (!trace || !trace.steps?.length) return
+  const step = trace.steps[m.refPtr % trace.steps.length].state
   m.refPtr++
-  const now = os.clock
-  const row = m.pageTable[page]
-  const willWrite = Math.random() < 0.4   // 约四成访问为写操作 → 置「修改位」
 
-  const fi = m.frames.indexOf(page)
-  if (fi >= 0) {                            // —— 命中 ——
-    m.hits++
+  const page = step.引用页
+  const hit = step.命中
+  const evicted = step.换出页 ?? null
+  const now = os.clock
+  const willWrite = Math.random() < 0.4   // 约四成访问为写 → 置「修改位」
+  const blockSize = os.config.blockSize || 128
+  const unit = Math.floor(Math.random() * blockSize)   // 页内单元号（偏移）—— 地址转换用
+
+  // 写回判定须在重建页表之前读取被淘汰页的修改位
+  const wroteBack = !hit && evicted !== null && m.pageTable[evicted]
+    ? m.pageTable[evicted].修改位 === 1 : false
+
+  // 以后端页框快照为权威，重建页框与页表「标志/主存块号」
+  const snap = step.页框.slice(0, m.frameCount)
+  m.frames = snap
+  m.pageTable.forEach((row) => {
+    const idx = snap.indexOf(row.页号)
+    if (idx >= 0) {
+      if (row.标志 !== 1) { row.标志 = 1; row.loadTime = now }
+      row.主存块号 = idx
+    } else {
+      row.标志 = 0; row.主存块号 = null; row.访问位 = 0; row.修改位 = 0
+    }
+  })
+
+  const slot = snap.indexOf(page)
+  const row = m.pageTable[page]
+  if (row) {
     row.访问位 = 1
     row.lastUsed = now
-    if (willWrite) row.修改位 = 1
-    m.lastReplace = { 访问页: page, 缺页: false, 调出页: null, 装入页: page, 装入块: fi, 写回: false }
-    return
+    if (hit) { if (willWrite) row.修改位 = 1 }
+    else { row.修改位 = willWrite ? 1 : 0; row.loadTime = now }
   }
 
-  // —— 缺页 ——
-  m.faults++
-  let slot = m.frames.indexOf(null)
-  let victimPage = null
-  let wroteBack = false
-  if (slot < 0) {                           // 无空闲块 → 选淘汰块
-    slot = chooseVictim(os)
-    victimPage = m.frames[slot]
-    const vrow = m.pageTable[victimPage]
-    wroteBack = vrow.修改位 === 1            // 被淘汰页已修改 → 需写回外存
-    vrow.标志 = 0; vrow.主存块号 = null; vrow.访问位 = 0; vrow.修改位 = 0
-  }
-  // 装入新页
-  m.frames[slot] = page
-  row.标志 = 1; row.主存块号 = slot; row.访问位 = 1; row.修改位 = willWrite ? 1 : 0
-  row.loadTime = now; row.lastUsed = now
-  m.lastReplace = { 访问页: page, 缺页: true, 调出页: victimPage, 装入页: page, 装入块: slot, 写回: wroteBack }
+  if (hit) m.hits++
+  else m.faults++
 
-  const detail = victimPage === null
-    ? `装入空闲块 ${slot}`
-    : `调出页 ${victimPage}${wroteBack ? '(已修改,写回外存)' : ''}，装入页 ${page} → 主存块 ${slot}`
-  os.pushEvent('缺页中断', 'memory', 'warning', `访问页 ${page} 缺页 —— ${detail}`)
+  // 地址转换（保留 paging_engine.translate 设计）：绝对地址 = 主存块号 × 块长 + 单元号
+  const absAddr = slot >= 0 ? slot * blockSize + unit : null
+
+  m.lastReplace = {
+    访问页: page, 单元号: unit, 缺页: !hit,
+    调出页: hit ? null : evicted,
+    装入页: hit ? null : page,
+    装入块: slot >= 0 ? slot : null,
+    写回: wroteBack,
+    绝对地址: absAddr,        // 命中 → 直接得址；缺页 → 装入后重试得址
+  }
+
+  // 仅缺页推事件（命中的实时绝对地址在「最近访存」面板呈现，避免刷屏）
+  if (!hit) {
+    const detail = evicted === null
+      ? `装入空闲块 ${slot}`
+      : `调出页 ${evicted}${wroteBack ? '(已修改,写回外存)' : ''}，装入页 ${page} → 主存块 ${slot}`
+    os.pushEvent('缺页中断', 'memory', 'warning',
+      `访问 [页 ${page} 单元 ${unit}] 缺页中断 *${page} —— ${detail}（装入后绝对地址 ${absAddr}）`)
+  }
 }
 
 // ———————————————————————— 设备：磁盘驱动调度（接入真实后端引擎）————————————————————————
@@ -425,16 +537,218 @@ function makeRequest(os) {
   }
 }
 
+// ———————————————————————— 资源：银行家算法（接入后端引擎）————————————————————————
+
+const vecLe = (a, b) => a.every((x, j) => x <= b[j])
+const calcNeed = (max, alloc) => max.map((row, i) => row.map((v, j) => v - alloc[i][j]))
+
+/** 本地回退：安全性算法（多趟扫描），返回与后端 check_safety 同形的结果。 */
+function localSafety(available, max, allocation) {
+  const n = allocation.length, m = available.length
+  const need = calcNeed(max, allocation)
+  const work = [...available]
+  const finish = new Array(n).fill(false)
+  const seq = []
+  let changed = true
+  while (changed) {
+    changed = false
+    for (let i = 0; i < n; i++) {
+      if (!finish[i] && vecLe(need[i], work)) {
+        for (let j = 0; j < m; j++) work[j] += allocation[i][j]
+        finish[i] = true; seq.push(`P${i}`); changed = true
+      }
+    }
+  }
+  const safe = finish.every(Boolean)
+  const deadlock = finish.map((f, i) => (f ? null : `P${i}`)).filter(Boolean)
+  return {
+    metrics: { 安全: safe, 安全序列: safe ? seq : null },
+    final_state: { Available: [...available], Max: max, Allocation: allocation, Need: need, 安全序列: safe ? seq : [], 死锁进程: deadlock },
+  }
+}
+
+/** 本地回退：资源请求算法（试探分配 + 安全性检查）。 */
+function localBankerRequest(r, pid, req) {
+  const need = r.need
+  if (!vecLe(req, need[pid])) return { metrics: { 可分配: false, 原因: `请求超过进程 P${pid} 的最大需求 Need=${need[pid]}`, 安全: false }, final_state: { Need: need, Available: [...r.available] } }
+  if (!vecLe(req, r.available)) return { metrics: { 可分配: false, 原因: `资源不足，请求 ${req} > 可用 ${r.available}，须等待`, 安全: false }, final_state: { Need: need, Available: [...r.available] } }
+  const newAvail = r.available.map((v, j) => v - req[j])
+  const newAlloc = r.allocation.map((row, i) => (i === pid ? row.map((v, j) => v + req[j]) : [...row]))
+  const safety = localSafety(newAvail, r.max, newAlloc)
+  const safe = safety.metrics.安全
+  return {
+    metrics: { 可分配: safe, 原因: safe ? `试探分配后系统安全，立即分配` : `试探分配后进入不安全状态，拒绝本次请求`, 安全: safe },
+    final_state: {
+      Available: safe ? newAvail : [...r.available],
+      Allocation: safe ? newAlloc : r.allocation,
+      Need: safe ? safety.final_state.Need : need,
+      安全序列: safe ? safety.final_state.安全序列 : [],
+      死锁进程: safety.final_state.死锁进程,
+    },
+  }
+}
+
+/** 对当前资源态做安全性检查，写回真实安全序列 / 死锁标志。 */
+async function refreshBankerSafety(os, announce = true) {
+  const r = os.resources
+  let trace
+  try {
+    trace = await api.bankerSafety({ available: r.available, max: r.max, allocation: r.allocation })
+    bankerFallbackNotified = false
+  } catch (e) {
+    trace = localSafety(r.available, r.max, r.allocation)
+    if (!bankerFallbackNotified) {
+      os.pushEvent('银行家回退', 'resource', 'warning', `后端银行家接口不可用，临时使用前端等价算法：${e?.message || e}`)
+      bankerFallbackNotified = true
+    }
+  }
+  const safe = trace.metrics.安全
+  r.safeSeq = trace.final_state.安全序列 || []
+  r.deadlock = !safe
+  if (announce) {
+    if (safe) os.pushEvent('安全性检查', 'resource', 'info', `银行家算法通过安全性检查，安全序列 ${r.safeSeq.join(',')}`)
+    else os.pushEvent('死锁告警', 'resource', 'danger', `系统处于不安全状态，死锁进程 ${(trace.final_state.死锁进程 || []).join(',')}`)
+  }
+}
+
+/**
+ * 一次资源活动（fire-and-forget）：约 35% 概率随机释放已占资源，
+ * 否则挑一个进程发起资源请求并按银行家判定结果落库（进程 → 资源 因果联动）。
+ */
+async function serveBankerRequest(os) {
+  if (bankerBusy) return
+  bankerBusy = true
+  try {
+    const r = os.resources
+    const n = r.allocation.length
+
+    // —— 释放：进程阶段性归还，已占资源回收（让矩阵呼吸、避免单调耗尽）——
+    if (Math.random() < 0.35) {
+      const i = Math.floor(Math.random() * n)
+      const alloc = r.allocation[i]
+      if (alloc.some((v) => v > 0)) {
+        const rel = alloc.map((v) => Math.round(Math.random() * v))
+        if (rel.some((v) => v > 0)) {
+          r.available = r.available.map((v, j) => v + rel[j])
+          r.allocation = r.allocation.map((row, ri) => (ri === i ? row.map((v, j) => v - rel[j]) : row))
+          r.need = calcNeed(r.max, r.allocation)
+          os.pushEvent('资源释放', 'resource', 'info', `P${i} 释放资源 [${rel}]，回收至可用资源池`)
+          await refreshBankerSafety(os, false)
+          return
+        }
+      }
+    }
+
+    // —— 请求：构造请求向量（多数 ≤ Need，约 1/4 超额以演示等待/拒绝）——
+    const i = Math.floor(Math.random() * n)
+    const need = r.need[i]
+    const aggressive = Math.random() < 0.25
+    const request = need.map((nd, j) => {
+      const hi = aggressive ? Math.max(nd, r.available[j]) + 1 : Math.min(nd, r.available[j])
+      return Math.max(0, Math.round(Math.random() * hi))
+    })
+    if (request.every((v) => v === 0)) return  // 空请求跳过
+
+    let trace
+    try {
+      trace = await api.bankerRequest({ available: r.available, max: r.max, allocation: r.allocation, pid: i, request, use_banker: true })
+      bankerFallbackNotified = false
+    } catch (e) {
+      trace = localBankerRequest(r, i, request)
+      if (!bankerFallbackNotified) {
+        os.pushEvent('银行家回退', 'resource', 'warning', `后端银行家接口不可用，临时使用前端等价算法：${e?.message || e}`)
+        bankerFallbackNotified = true
+      }
+    }
+
+    const fs = trace.final_state || {}
+    if (trace.metrics.可分配) {
+      r.available = fs.Available
+      r.allocation = fs.Allocation
+      r.need = fs.Need
+      r.safeSeq = fs.安全序列 || r.safeSeq
+      r.deadlock = false
+      os.pushEvent('资源分配', 'resource', 'info', `P${i} 申请 [${request}] 获准，安全序列 ${(fs.安全序列 || []).join(',')}`)
+    } else {
+      os.pushEvent('资源请求', 'resource', 'warning', `P${i} 申请 [${request}] 未获准：${trace.metrics.原因 || '不安全 / 资源不足'}`)
+      if ((fs.死锁进程 || []).length) r.deadlock = true
+    }
+  } finally {
+    bankerBusy = false
+  }
+}
+
+// ———————————————————————— 同步：PV 生产者-消费者（进程驱动，语义同 sync_engine）————————————————————————
+// 计数信号量：s1=空闲缓冲、s2=产品；P 使信号量-1(<0 则阻塞入队)，V 使其+1(<=0 则唤醒一个等待者)。
+// 唤醒者继续完成其后半段(存入/取出 + 对应 V)，与 backend/app/engines/sync_engine 完全一致。
+
+function pvWakeConsumer(s, os) {           // 一个被唤醒的消费者完成消费后半段
+  s.buffer--; s.consumed++; s.s1++         // 取出 + V(s1)
+  if (s.s1 <= 0 && s.prodBlocked.length) {
+    const w = s.prodBlocked.shift()
+    os.pushEvent('同步唤醒', 'resource', 'info', `V(s1) 唤醒生产者 ${w}`)
+    pvWakeProducer(s, os)
+  }
+}
+function pvWakeProducer(s, os) {            // 一个被唤醒的生产者完成生产后半段
+  s.buffer++; s.produced++; s.s2++         // 存入 + V(s2)
+  if (s.s2 <= 0 && s.consBlocked.length) {
+    const w = s.consBlocked.shift()
+    os.pushEvent('同步唤醒', 'resource', 'info', `V(s2) 唤醒消费者 ${w}`)
+    pvWakeConsumer(s, os)
+  }
+}
+function pvProduce(s, proc, os) {
+  s.s1--                                   // P(s1)
+  if (s.s1 < 0) {
+    s.prodBlocked.push(proc)
+    os.pushEvent('生产阻塞', 'resource', 'warning', `P(s1) 后 s1=${s.s1}<0，${proc} 阻塞（缓冲区满）`)
+  } else {
+    s.buffer++; s.produced++; s.s2++       // 存入 + V(s2)
+    if (s.s2 <= 0 && s.consBlocked.length) {
+      const w = s.consBlocked.shift()
+      os.pushEvent('同步唤醒', 'resource', 'info', `V(s2) 唤醒消费者 ${w}`)
+      pvWakeConsumer(s, os)
+    }
+  }
+}
+function pvConsume(s, proc, os) {
+  s.s2--                                   // P(s2)
+  if (s.s2 < 0) {
+    s.consBlocked.push(proc)
+    os.pushEvent('消费阻塞', 'resource', 'warning', `P(s2) 后 s2=${s.s2}<0，${proc} 阻塞（缓冲区空）`)
+  } else {
+    s.buffer--; s.consumed++; s.s1++       // 取出 + V(s1)
+    if (s.s1 <= 0 && s.prodBlocked.length) {
+      const w = s.prodBlocked.shift()
+      os.pushEvent('同步唤醒', 'resource', 'info', `V(s1) 唤醒生产者 ${w}`)
+      pvWakeProducer(s, os)
+    }
+  }
+}
+
+/** 一拍同步活动：由进程驱动(运行进程偏生产)，缓冲越满越偏消费 → 自平衡且偶发阻塞/唤醒。 */
+function stepSync(os, running) {
+  const s = os.sync
+  const producer = (running && running.name) || pick(os.processes)?.name || 'proc'
+  const consumer = pick(os.processes)?.name || 'proc'
+  const fillRatio = s.buffer / Math.max(1, s.capacity)
+  const pProduce = 0.65 - 0.5 * fillRatio   // 满→0.15(仍偶尔撑满阻塞)、空→0.65
+  if (Math.random() < pProduce) pvProduce(s, producer, os)
+  else pvConsume(s, consumer, os)
+}
+
 // ———————————————————————— 主时钟步进 ————————————————————————
 async function tick(os) {
   os.clock++
   const t = os.clock
 
-  // —— 处理机：以后端调度 trace 为准逐周期回放 ——
+  // —— 处理机/存储：以后端 trace 为准逐周期回放 ——
   await prepareCpuTrace(os)
+  await prepareMemoryTrace(os)
   const running = applyCpuTrace(os)
 
-  // —— 预留联动接口：CPU 运行期间可触发访存 / I/O ——
+  // —— 因果联动：CPU 运行的进程驱动访存 / 磁盘 I/O ——
   if (running && Math.random() < 0.7) onCpuMemoryAccess(os, running)
   if (running && Math.random() < 0.08) onCpuDiskRequest(os, running)
 
@@ -447,18 +761,8 @@ async function tick(os) {
     if (os.processes.length > 12) os.processes.shift()
   }
 
-  // —— 资源：银行家分配（mock）——
-  if (t % 5 === 0) {
-    const r = os.resources
-    if (Math.random() < 0.12) {
-      r.deadlock = true
-      os.pushEvent('死锁告警', 'resource', 'danger', '检测到循环等待，系统进入不安全状态')
-    } else {
-      r.deadlock = false
-      r.safeSeq = ['P1', 'P3', 'P4', 'P0', 'P2']
-      os.pushEvent('资源分配', 'resource', 'info', `银行家算法通过安全性检查，安全序列 ${r.safeSeq.join(',')}`)
-    }
-  }
+  // —— 资源：银行家算法（异步调用后端引擎，进程驱动资源请求/释放）——
+  if (t % 5 === 0) serveBankerRequest(os)  // fire-and-forget
 
   // —— 设备：磁盘驱动调度（异步调用后端，不阻塞主时钟）——
   if (os.disk.queue.length && t % 2 === 0) serveDisk(os)  // fire-and-forget
@@ -468,12 +772,8 @@ async function tick(os) {
     os.pushEvent('I/O请求', 'device', 'info', `新增 I/O 请求：${req.进程名} 柱面 ${req.柱面号}/磁道 ${req.磁道号}/记录 ${req.物理记录号}`)
   }
 
-  // —— 同步：生产者-消费者 ——
-  if (Math.random() < 0.4) {
-    const s = os.sync
-    if (Math.random() < 0.5 && s.buffer < s.capacity) { s.buffer++; s.s1--; s.s2++; s.produced++ }
-    else if (s.buffer > 0) { s.buffer--; s.s1++; s.s2--; s.consumed++ }
-  }
+  // —— 同步：生产者-消费者（进程驱动 PV，不再随机）——
+  if (Math.random() < 0.5) stepSync(os, running)
 
   // —— 指标聚合 ——
   const used = os.memory.frames.filter((x) => x !== null).length
@@ -503,7 +803,8 @@ export function useOsDriver() {
   }
   async function start() {
     if (os.running) return
-    await prepareCpuTrace(os)
+    await Promise.all([prepareCpuTrace(os), prepareMemoryTrace(os)])
+    await refreshBankerSafety(os)
     os.running = true
     schedule()
   }
@@ -525,6 +826,12 @@ export function useOsDriver() {
     cpuTracePromise = null
     lastCpuRunning = null
     cpuFallbackNotified = false
+    memTrace = null
+    memTraceKey = ''
+    memTracePromise = null
+    memFallbackNotified = false
+    bankerBusy = false
+    bankerFallbackNotified = false
     os.resetState()
   }
 
