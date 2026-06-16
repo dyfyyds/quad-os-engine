@@ -2,7 +2,7 @@
   <div class="qos-page">
     <div class="qos-page-head">
       <h2 class="qos-page-title">进程与资源核心</h2>
-      <p class="qos-page-sub">银行家算法死锁避免 · PV 信号量同步（mock）</p>
+      <p class="qos-page-sub">银行家算法死锁避免 · PV 信号量同步（银行家·同步引擎，进程驱动）</p>
     </div>
 
     <el-alert v-if="os.resources.deadlock" type="error" :closable="false" show-icon style="margin-bottom: 14px;"
