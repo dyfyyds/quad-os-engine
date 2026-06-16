@@ -51,5 +51,9 @@ export const useOsStore = defineStore('os', {
     resetState() {
       this.$state = seedState()
     },
+    // 按当前（已编辑）config 重建 memory/disk —— 系统设置「保存配置」即生效
+    applyConfig() {
+      this.$state = seedState(this.config)
+    },
   },
 })

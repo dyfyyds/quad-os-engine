@@ -43,8 +43,8 @@ export function useOsWorld() {
         },
         {
           key: 'device', title: '设备', icon: 'Files', color: '#f0a020',
-          metric: `磁道 ${os.disk.head}`, sub: `队列 ${os.disk.queue.length}`,
-          bar: os.disk.head / (os.disk.trackCount - 1), health: os.coreHealth.device,
+          metric: `柱面 ${os.disk.head}`, sub: `队列 ${os.disk.queue.length}`,
+          bar: os.disk.head / (os.disk.cylinders - 1), health: os.coreHealth.device,
           active: os.running && activity('device') > 0,
         },
       ],

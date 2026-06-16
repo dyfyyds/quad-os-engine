@@ -4,6 +4,9 @@ import { useOsStore } from '../store/os'
  * Mock 驱动 —— 按虚拟时钟推进，向中央 store 写入「连贯」的 OS 运行叙事，
  * 让总览大屏与各核心页彼此联动地「活」起来。
  *
+ * 存储置换（FIFO/LRU/OPT/CLOCK）与磁盘驱动调度（FCFS/SSTF/SCAN/LOOK/C-SCAN/C-LOOK）
+ * 均按 os.config 的算法选择真实分支执行，切换算法即刻改变行为。
+ *
  * ⚠️ TODO(team): 本驱动为脚手架占位。团队接入真实逻辑时，用对
  * backend/app/engines/* 的真实编排替换 tick() 内的 mock 变更，
  * 保持对 store 字段的写入契约不变即可（详见 docs/接口契约.md）。
@@ -12,6 +15,165 @@ let timer = null
 const rand = (a, b) => a + Math.random() * (b - a)
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
 
+// ———————————————————————— 处理机：就绪进程选择（按调度算法）————————————————————————
+function chooseReady(ready, os) {
+  const t = os.clock
+  switch (os.config.schedAlgo) {
+    case 'FCFS':
+      return ready.reduce((a, b) => (a.arrival <= b.arrival ? a : b))
+    case 'SJF':
+      return ready.reduce((a, b) => ((a.burst - a.ran) <= (b.burst - b.ran) ? a : b))
+    case 'HRRN':
+      return ready.reduce((a, b) => {
+        const ra = (t - a.arrival + a.burst) / Math.max(1, a.burst)
+        const rb = (t - b.arrival + b.burst) / Math.max(1, b.burst)
+        return ra >= rb ? a : b
+      })
+    case 'PRIORITY':
+      return ready.reduce((a, b) => (a.priority <= b.priority ? a : b))
+    case 'RR':
+    default:
+      return ready.reduce((a, b) => (a.arrival <= b.arrival ? a : b))
+  }
+}
+
+// ———————————————————————— 存储：缺页置换的淘汰块选择 ————————————————————————
+function chooseVictim(os) {
+  const m = os.memory
+  const occupied = m.frames.map((pg, idx) => ({ pg, idx })).filter((o) => o.pg !== null)
+
+  switch (os.config.pageAlgo) {
+    case 'FIFO':
+      return occupied.reduce((a, b) => (m.pageTable[a.pg].loadTime <= m.pageTable[b.pg].loadTime ? a : b)).idx
+    case 'OPT': {
+      const ref = m.refString, L = ref.length
+      // 从下一次访问起向后看一圈，淘汰「最久不再被使用」的驻留页
+      const nextUse = (pg) => {
+        for (let k = 0; k < L; k++) if (ref[(m.refPtr + k) % L] === pg) return k
+        return Infinity
+      }
+      let best = occupied[0].idx, far = -1
+      for (const o of occupied) {
+        const d = nextUse(o.pg)
+        if (d > far) { far = d; best = o.idx }
+      }
+      return best
+    }
+    case 'CLOCK': {
+      const n = m.frames.length
+      for (let guard = 0; guard < n * 2; guard++) {
+        const ptr = m.clockPtr % n
+        const pg = m.frames[ptr]
+        if (pg === null || m.pageTable[pg].访问位 === 0) { m.clockPtr = (ptr + 1) % n; return ptr }
+        m.pageTable[pg].访问位 = 0          // 给第二次机会，清访问位后前移
+        m.clockPtr = (ptr + 1) % n
+      }
+      return 0
+    }
+    case 'LRU':
+    default:
+      return occupied.reduce((a, b) => (m.pageTable[a.pg].lastUsed <= m.pageTable[b.pg].lastUsed ? a : b)).idx
+  }
+}
+
+// 一次访存：命中则更新访问/修改位；缺页则按算法置换并记录「调出页 / 装入页号」
+function accessPage(os) {
+  const m = os.memory
+  const page = m.refString[m.refPtr % m.refString.length]
+  m.refPtr++
+  const now = os.clock
+  const row = m.pageTable[page]
+  const willWrite = Math.random() < 0.4   // 约四成访问为写操作 → 置「修改位」
+
+  const fi = m.frames.indexOf(page)
+  if (fi >= 0) {                            // —— 命中 ——
+    m.hits++
+    row.访问位 = 1
+    row.lastUsed = now
+    if (willWrite) row.修改位 = 1
+    m.lastReplace = { 访问页: page, 缺页: false, 调出页: null, 装入页: page, 装入块: fi, 写回: false }
+    return
+  }
+
+  // —— 缺页 ——
+  m.faults++
+  let slot = m.frames.indexOf(null)
+  let victimPage = null
+  let wroteBack = false
+  if (slot < 0) {                           // 无空闲块 → 选淘汰块
+    slot = chooseVictim(os)
+    victimPage = m.frames[slot]
+    const vrow = m.pageTable[victimPage]
+    wroteBack = vrow.修改位 === 1            // 被淘汰页已修改 → 需写回外存
+    vrow.标志 = 0; vrow.主存块号 = null; vrow.访问位 = 0; vrow.修改位 = 0
+  }
+  // 装入新页
+  m.frames[slot] = page
+  row.标志 = 1; row.主存块号 = slot; row.访问位 = 1; row.修改位 = willWrite ? 1 : 0
+  row.loadTime = now; row.lastUsed = now
+  m.lastReplace = { 访问页: page, 缺页: true, 调出页: victimPage, 装入页: page, 装入块: slot, 写回: wroteBack }
+
+  const detail = victimPage === null
+    ? `装入空闲块 ${slot}`
+    : `调出页 ${victimPage}${wroteBack ? '(已修改,写回外存)' : ''}，装入页 ${page} → 主存块 ${slot}`
+  os.pushEvent('缺页中断', 'memory', 'warning', `访问页 ${page} 缺页 —— ${detail}`)
+}
+
+// ———————————————————————— 设备：磁盘驱动调度（移臂 + 旋转）————————————————————————
+function chooseDiskRequest(d, algo) {
+  const q = d.queue
+  if (algo === 'FCFS') return 0
+  if (algo === 'SSTF') {
+    let bi = 0, bd = Infinity
+    q.forEach((r, i) => { const dist = Math.abs(r.柱面号 - d.head); if (dist < bd) { bd = dist; bi = i } })
+    return bi
+  }
+  // SCAN / LOOK / C-SCAN / C-LOOK —— 沿当前方向取最近柱面，本方向无请求则换向
+  const nearestIn = (dir) => {
+    let bi = -1, bd = Infinity
+    q.forEach((r, i) => {
+      const ahead = dir > 0 ? r.柱面号 >= d.head : r.柱面号 <= d.head
+      if (ahead) { const dist = Math.abs(r.柱面号 - d.head); if (dist < bd) { bd = dist; bi = i } }
+    })
+    return bi
+  }
+  let bi = nearestIn(d.direction)
+  if (bi < 0) { d.direction = -d.direction; bi = nearestIn(d.direction) }
+  return bi < 0 ? 0 : bi
+}
+
+function serveDisk(os) {
+  const d = os.disk
+  const idx = chooseDiskRequest(d, os.config.diskAlgo)
+  const req = d.queue[idx]
+  const seek = Math.abs(req.柱面号 - d.head)
+  if (req.柱面号 !== d.head) d.direction = req.柱面号 > d.head ? 1 : -1
+  // 移臂调度：移动到目标柱面
+  d.totalSeek += seek
+  d.head = req.柱面号
+  d.path.push(req.柱面号)
+  if (d.path.length > 30) d.path.shift()
+  // 旋转调度：柱面内旋转到目标物理记录
+  d.currentRecord = req.物理记录号
+  d.queue.splice(idx, 1)
+  d.served++
+  d.servedLog.unshift({ ...req, 寻道: seek, ts: os.clock })
+  if (d.servedLog.length > 8) d.servedLog.pop()
+  os.pushEvent('驱动调度', 'device', 'info',
+    `${req.进程名}：移臂至柱面 ${req.柱面号}(寻道 ${seek}) → 磁道 ${req.磁道号}/旋转至记录 ${req.物理记录号}`)
+}
+
+function makeRequest(os) {
+  const d = os.disk
+  return {
+    进程名: os.processes.length ? pick(os.processes).name : 'job',
+    柱面号: Math.round(rand(0, d.cylinders - 1)),
+    磁道号: Math.round(rand(0, d.tracksPerCyl - 1)),
+    物理记录号: Math.round(rand(0, d.recordsPerTrack - 1)),
+  }
+}
+
+// ———————————————————————— 主时钟步进 ————————————————————————
 function tick(os) {
   os.clock++
   const t = os.clock
@@ -33,36 +195,23 @@ function tick(os) {
       running = null
     }
   }
-  // 调度下一个就绪进程
+  // 调度下一个就绪进程（按 schedAlgo）
   if (!running) {
     const ready = os.processes.filter((p) => p.state === '就绪')
     if (ready.length) {
-      const next = ready.reduce((a, b) => (a.priority <= b.priority ? a : b))
+      const next = chooseReady(ready, os)
       next.state = '运行'
       os.gantt.push({ 作业: next.name, 开始: t, 结束: t + 1 })
       if (os.gantt.length > 24) os.gantt.shift()
-      os.pushEvent('进程调度', 'processor', 'info', `调度器选中 ${next.name}(P${next.pid}) 占用 CPU`)
+      os.pushEvent('进程调度', 'processor', 'info', `${os.config.schedAlgo} 调度器选中 ${next.name}(P${next.pid}) 占用 CPU`)
     }
   } else {
     const seg = os.gantt[os.gantt.length - 1]
     if (seg && seg.作业 === running.name) seg.结束 = t
   }
 
-  // —— 存储：访存与缺页 ——
-  if (running && Math.random() < 0.7) {
-    const m = os.memory
-    const page = m.refString[m.refPtr % m.refString.length]
-    m.refPtr++
-    if (m.frames.includes(page)) {
-      m.hits++
-    } else {
-      m.faults++
-      const free = m.frames.indexOf(null)
-      const victimIdx = free >= 0 ? free : Math.floor(rand(0, m.frames.length))
-      m.frames[victimIdx] = page
-      os.pushEvent('缺页中断', 'memory', 'warning', `访问页 ${page} 缺页，装入主存块 ${victimIdx}`)
-    }
-  }
+  // —— 存储：访存与缺页置换 ——
+  if (running && Math.random() < 0.7) accessPage(os)
 
   // —— 新作业到达 ——
   if (t % 7 === 0) {
@@ -93,21 +242,12 @@ function tick(os) {
     }
   }
 
-  // —— 设备：磁盘 I/O ——
-  if (os.disk.queue.length && t % 2 === 0) {
-    const d = os.disk
-    const nearest = d.queue.reduce((a, b) => (Math.abs(b - d.head) < Math.abs(a - d.head) ? b : a))
-    d.totalSeek += Math.abs(nearest - d.head)
-    d.head = nearest
-    d.path.push(nearest)
-    if (d.path.length > 30) d.path.shift()
-    d.queue = d.queue.filter((x) => x !== nearest)
-    d.served++
-    os.pushEvent('I/O完成', 'device', 'info', `磁头移动至磁道 ${nearest}，本次寻道服务完成`)
-  }
-  if (os.disk.queue.length < 3 && t % 6 === 0) {
-    os.disk.queue.push(Math.round(rand(0, os.disk.trackCount - 1)))
-    os.pushEvent('I/O请求', 'device', 'info', '新增磁盘访问请求')
+  // —— 设备：磁盘驱动调度 ——
+  if (os.disk.queue.length && t % 2 === 0) serveDisk(os)
+  if (os.disk.queue.length < 6 && t % 6 === 0) {
+    const req = makeRequest(os)
+    os.disk.queue.push(req)
+    os.pushEvent('I/O请求', 'device', 'info', `新增 I/O 请求：${req.进程名} 柱面 ${req.柱面号}/磁道 ${req.磁道号}/记录 ${req.物理记录号}`)
   }
 
   // —— 同步：生产者-消费者 ——
