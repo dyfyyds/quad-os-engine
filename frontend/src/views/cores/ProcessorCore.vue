@@ -2,7 +2,7 @@
   <div class="qos-page">
     <div class="qos-page-head">
       <h2 class="qos-page-title">处理机调度核心</h2>
-      <p class="qos-page-sub">进程控制块(PCB) · 就绪/阻塞队列 · 甘特图 —— 当前调度算法：{{ os.config.schedAlgo }}（mock）</p>
+      <p class="qos-page-sub">进程控制块(PCB) · 就绪/阻塞队列 · 甘特图 —— 当前调度算法：{{ os.config.schedAlgo }}（调度引擎）</p>
     </div>
 
     <el-row :gutter="14" style="margin-bottom: 14px;">
@@ -13,7 +13,7 @@
     </el-row>
 
     <SectionCard title="CPU 执行甘特图" icon="Histogram" style="margin-bottom: 14px;">
-      <GanttChart :gantt="os.gantt" :reveal="os.gantt.length - 1" />
+      <GanttChart :gantt="os.gantt" :reveal="ganttReveal" />
     </SectionCard>
 
     <el-row :gutter="14">
@@ -51,6 +51,7 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useOsStore } from '../../store/os'
 import StatCard from '../../components/widgets/StatCard.vue'
 import SectionCard from '../../components/widgets/SectionCard.vue'
@@ -58,6 +59,12 @@ import StatusBadge from '../../components/widgets/StatusBadge.vue'
 import GanttChart from '../../components/viz/GanttChart.vue'
 
 const os = useOsStore()
+const ganttReveal = computed(() => {
+  for (let i = os.gantt.length - 1; i >= 0; i--) {
+    if (os.gantt[i].开始 < os.clock) return i
+  }
+  return -1
+})
 </script>
 
 <style scoped>
