@@ -9,7 +9,7 @@
       <el-col :span="6"><SectionCard title="CPU 利用率"><GaugePanel :value="os.metrics.cpuUtil" label="CPU" color="#15a98a" :height="150" /></SectionCard></el-col>
       <el-col :span="6"><SectionCard title="内存占用"><GaugePanel :value="os.metrics.memUtil" label="MEM" color="#3b82f6" :height="150" /></SectionCard></el-col>
       <el-col :span="6"><SectionCard title="缺页率"><GaugePanel :value="os.metrics.faultRate" label="FAULT" color="#e64a45" :height="150" /></SectionCard></el-col>
-      <el-col :span="6"><SectionCard title="磁盘负载"><GaugePanel :value="diskLoad" label="DISK" color="#8b5cf6" :height="150" /></SectionCard></el-col>
+      <el-col :span="6"><SectionCard title="磁盘忙碌率"><GaugePanel :value="diskLoad" label="DISK" color="#8b5cf6" :height="150" /></SectionCard></el-col>
     </el-row>
 
     <el-row :gutter="14">
@@ -58,7 +58,7 @@ import GaugePanel from '../components/widgets/GaugePanel.vue'
 import StatusBadge from '../components/widgets/StatusBadge.vue'
 
 const os = useOsStore()
-const diskLoad = computed(() => Math.min(100, os.disk.queue.length * 12))
+const diskLoad = computed(() => os.disk.busyRate || 0)
 </script>
 
 <style scoped>

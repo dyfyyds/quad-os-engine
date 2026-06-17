@@ -30,8 +30,12 @@ let memFallbackNotified = false
 // —— 资源：银行家 ——
 let bankerBusy = false
 let bankerFallbackNotified = false
-const rand = (a, b) => a + Math.random() * (b - a)
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
+const JOB_NAMES = ['gcc', 'vim', 'sync', 'cron', 'http', 'db']
+const DISK_BUSY_WINDOW = 10
+
+function clampIndex(n, len) {
+  return len ? ((n % len) + len) % len : 0
+}
 
 // ———————————————————————— 处理机：后端调度 trace 准备与回放 ————————————————————————
 function cpuJobs(os) {
@@ -336,7 +340,9 @@ function onCpuDiskRequest(os, runningProc) {
   if (d.queue.length >= 8) return
   if (Math.random() >= getIoProb(runningProc.name)) return  // 按类型概率决定是否 I/O
   const req = makeRequest(os)
-  if (runningProc) req.进程名 = runningProc.name
+  if (runningProc) {
+    req.进程名 = runningProc.name
+  }
   d.queue.push(req)
   // 进程因 I/O 请求立即进入阻塞态（当 tick 生效，不再占用 CPU）
   if (runningProc && !d.ioBlocked.includes(runningProc.name)) {
@@ -462,17 +468,21 @@ function applyMemoryStep(os) {
   const m = os.memory
   const trace = memTrace
   if (!trace || !trace.steps?.length) return
-  const step = trace.steps[m.refPtr % trace.steps.length].state
+  if (m.refPtr >= trace.steps.length) {
+    m.traceCursor = trace.steps.length - 1
+    return
+  }
+  const step = trace.steps[m.refPtr].state
   m.refPtr++
-  m.traceCursor = (m.refPtr - 1) % trace.steps.length   // 揭示游标 → 当前步（MemoryCore「分步执行过程」据此逐步显示）
+  m.traceCursor = m.refPtr - 1   // 揭示游标 → 当前步（MemoryCore「分步执行过程」据此逐步显示）
 
   const page = step.引用页
   const hit = step.命中
   const evicted = step.换出页 ?? null
   const now = os.clock
-  const willWrite = Math.random() < 0.4   // 约四成访问为写 → 置「修改位」
   const blockSize = os.config.blockSize || 128
-  const unit = Math.floor(Math.random() * blockSize)   // 页内单元号（偏移）—— 地址转换用
+  const willWrite = ((page + now + m.refPtr) % 5) < 2   // 固定比例写访问 → 置「修改位」
+  const unit = (page * 31 + now * 17 + m.refPtr * 7) % blockSize   // 页内单元号（偏移）—— 地址转换用
 
   // 写回判定须在重建页表之前读取被淘汰页的修改位
   const wroteBack = !hit && evicted !== null && m.pageTable[evicted]
@@ -562,6 +572,29 @@ function applyMemoryStep(os) {
 
 // ———————————————————————— 设备：磁盘驱动调度（接入真实后端引擎）————————————————————————
 
+function recordDiskBusy(os, processName, serviceTime) {
+  const d = os.disk
+  const normalized = Math.max(1, Number(serviceTime) || 1)
+  const start = Math.max(os.clock, d.busyUntil || 0)
+  const end = start + normalized
+  d.busyUntil = end
+  d.busyLog.push({ start, end, serviceTime: normalized, processName })
+  const keepFrom = os.clock - DISK_BUSY_WINDOW * 3
+  d.busyLog = d.busyLog.filter((seg) => seg.end >= keepFrom)
+}
+
+function recomputeDiskBusyRate(os) {
+  const d = os.disk
+  const windowEnd = os.clock
+  const windowStart = windowEnd - DISK_BUSY_WINDOW
+  const busyTime = d.busyLog.reduce((sum, seg) => {
+    const overlap = Math.max(0, Math.min(seg.end, windowEnd) - Math.max(seg.start, windowStart))
+    return sum + overlap
+  }, 0)
+  d.busyRate = Math.min(100, Math.round((busyTime / DISK_BUSY_WINDOW) * 100))
+  d.busyLog = d.busyLog.filter((seg) => seg.end >= windowStart)
+}
+
 /**
  * 接入后端 /api/disk/simulate 进行完整 I/O 模拟（移臂 + 旋转 + 传输）。
  * 后端引擎支持 FCFS/SSTF/SCAN/C-SCAN/LOOK/C-LOOK/F-SCAN/N-SCAN 八种算法。
@@ -592,6 +625,7 @@ async function serveDisk(os) {
       const st = first.state
       const seek = st['寻道距离']
       const servedName = st['进程名']
+      const serviceTime = st['服务时间']
 
       // 更新磁头位置
       d.head = st['目标柱面']
@@ -608,7 +642,8 @@ async function serveDisk(os) {
       if (idx >= 0) {
         const req = d.queue.splice(idx, 1)[0]
         d.served++
-        d.servedLog.unshift({ ...req, 寻道: seek, ts: os.clock })
+        recordDiskBusy(os, servedName, serviceTime)
+        d.servedLog.unshift({ ...req, 寻道: seek, 服务时间: serviceTime, ts: os.clock })
         if (d.servedLog.length > 8) d.servedLog.pop()
       }
 
@@ -639,6 +674,7 @@ function serveDiskLocal(os) {
   })
   const req = d.queue[bi]
   const seek = Math.abs(req.柱面号 - d.head)
+  const serviceTime = seek + 1
   d.totalSeek += seek
   d.head = req.柱面号
   d.currentRecord = req.物理记录号
@@ -646,7 +682,8 @@ function serveDiskLocal(os) {
   if (d.path.length > 30) d.path.shift()
   d.queue.splice(bi, 1)
   d.served++
-  d.servedLog.unshift({ ...req, 寻道: seek, ts: os.clock })
+  recordDiskBusy(os, req.进程名, serviceTime)
+  d.servedLog.unshift({ ...req, 寻道: seek, 服务时间: serviceTime, ts: os.clock })
   if (d.servedLog.length > 8) d.servedLog.pop()
   // 注意：「阻塞→就绪」由 applyCpuTrace 开头的 I/O 完成协调器统一处理（同 serveDisk）。
   os.pushEvent('驱动调度', 'device', 'info',
@@ -655,11 +692,13 @@ function serveDiskLocal(os) {
 
 function makeRequest(os) {
   const d = os.disk
+  const pid = os.runningProc?.pid || os.nextPid || 1
+  const t = os.clock
   return {
-    进程名: os.processes.length ? pick(os.processes).name : 'job',
-    柱面号: Math.round(rand(0, d.cylinders - 1)),
-    磁道号: Math.round(rand(0, d.tracksPerCyl - 1)),
-    物理记录号: Math.round(rand(0, d.recordsPerTrack - 1)),
+    进程名: os.runningProc?.name || `job${pid}`,
+    柱面号: (pid * 37 + t * 11 + d.served * 5) % d.cylinders,
+    磁道号: (pid + t + d.queue.length) % d.tracksPerCyl,
+    物理记录号: (pid * 3 + t + d.currentRecord) % d.recordsPerTrack,
   }
 }
 
@@ -738,6 +777,8 @@ async function refreshBankerSafety(os, announce = true) {
 }
 
 /**
+ * 一次资源活动：按虚拟时钟确定性释放或请求资源，
+ * 再由银行家算法判定并落库（进程 → 资源 因果联动）。
  * 运行进程请求资源（因果联动：CPU 调度 → 资源申请）。
  * 请求向量 = min(Need[i], Available)，由运行进程的实际需求决定，非随机。
  */
@@ -747,6 +788,40 @@ async function serveBankerRequest(os, proc) {
   try {
     const r = os.resources
     const n = r.allocation.length
+    const phase = Math.floor(os.clock / 5)
+
+    // —— 释放：进程阶段性归还，已占资源回收（让矩阵呼吸、避免单调耗尽）——
+    if (phase % 3 === 0) {
+      const i = clampIndex(phase, n)
+      const alloc = r.allocation[i]
+      if (alloc.some((v) => v > 0)) {
+        const rel = alloc.map((v, j) => (v > 0 && (phase + j) % 2 === 0 ? 1 : 0))
+        if (rel.some((v) => v > 0)) {
+          r.available = r.available.map((v, j) => v + rel[j])
+          r.allocation = r.allocation.map((row, ri) => (ri === i ? row.map((v, j) => v - rel[j]) : row))
+          r.need = calcNeed(r.max, r.allocation)
+          os.pushEvent('资源释放', 'resource', 'info', `P${i} 释放资源 [${rel}]，回收至可用资源池`)
+          await refreshBankerSafety(os, false)
+          return
+        }
+      }
+    }
+
+    // —— 请求：构造请求向量（多数 ≤ Need，固定节拍超额以演示等待/拒绝）——
+    const i = clampIndex(phase, n)
+    const need = r.need[i]
+    const aggressive = phase % 4 === 0
+    const request = need.map((nd, j) => {
+      if (nd <= 0) return 0
+      if (aggressive && j === phase % need.length) return nd + 1
+      const hi = Math.min(nd, r.available[j])
+      return hi > 0 && (phase + j) % 2 === 0 ? 1 : 0
+    })
+    if (request.every((v) => v === 0)) {
+      const j = need.findIndex((nd, idx) => nd > 0 && r.available[idx] > 0)
+      if (j >= 0) request[j] = 1
+    }
+    if (request.every((v) => v === 0)) return  // 空请求跳过
     const i = proc.pid % n  // 进程 pid 映射到银行家矩阵索引
 
     // 请求向量 = 该进程还需要多少（不超过可用量）
@@ -868,10 +943,48 @@ function syncProduce(os, running) {
  */
 function syncConsume(os) {
   const s = os.sync
+  const producer = (running && running.name) || os.processes[clampIndex(os.clock, os.processes.length)]?.name || 'proc'
+  const consumer = os.processes[clampIndex(os.clock + 1, os.processes.length)]?.name || 'proc'
+  const fillRatio = s.buffer / Math.max(1, s.capacity)
+  const shouldProduce = s.buffer === 0 || (s.buffer < s.capacity && (os.clock + Math.round(fillRatio * 10)) % 2 === 0)
+  if (shouldProduce) pvProduce(s, producer, os)
+  else pvConsume(s, consumer, os)
   if (s.buffer <= 0) return  // 缓冲空，跳过
   const blocked = os.processes.filter(p => p.state === '阻塞')
   if (!blocked.length) return
   pvConsume(s, blocked[0].name, os)
+}
+
+function addDeterministicArrival(os, t) {
+  const pid = os.nextPid++
+  const name = `${JOB_NAMES[clampIndex(pid, JOB_NAMES.length)]}${pid}`
+  os.processes.push({
+    pid,
+    name,
+    state: '就绪',
+    arrival: t,
+    burst: 4 + ((pid + t) % 7),
+    ran: 0,
+    priority: 1 + ((pid + t) % 4),
+  })
+  os.pushEvent('作业到达', 'processor', 'info', `新作业 ${name} 进入就绪队列`)
+}
+
+function recomputeRuntimeMetrics(os) {
+  const used = os.memory.frames.filter((x) => x !== null).length
+  const refs = os.memory.faults + os.memory.hits
+  const busy = os.gantt.reduce((sum, seg) => sum + Math.max(0, seg.结束 - seg.开始), 0)
+  const completed = os.processes.filter((p) => p.state === '完成')
+  recomputeDiskBusyRate(os)
+
+  os.metrics.cpuUtil = os.clock ? Math.round((busy / os.clock) * 100) : 0
+  os.metrics.memUtil = Math.round((used / Math.max(1, os.memory.capacity)) * 100)
+  os.metrics.diskQueueLen = os.disk.queue.length
+  os.metrics.faultRate = refs ? Math.round((os.memory.faults / refs) * 100) : 0
+  os.metrics.readyLen = os.processes.filter((p) => p.state === '就绪').length
+  os.metrics.blockedLen = os.processes.filter((p) => p.state === '阻塞').length
+  os.metrics.completed = completed.length
+  os.metrics.throughput = +(completed.length / Math.max(1, os.clock)).toFixed(2)
 }
 
 // ———————————————————————— 主时钟步进 ————————————————————————
@@ -879,11 +992,29 @@ async function tick(os) {
   os.clock++
   const t = os.clock
 
+  // —— 新作业到达：固定节拍与固定参数，保证重置后可复现 ——
+  if (t % 7 === 0) addDeterministicArrival(os, t)
+
   // —— 处理机/存储：以后端 trace 为准逐周期回放 ——
   await prepareCpuTrace(os)
   await prepareMemoryTrace(os)
   const running = applyCpuTrace(os)
 
+  // —— 因果联动：CPU 运行的进程驱动访存 / 磁盘 I/O ——
+  if (running) onCpuMemoryAccess(os, running)
+  if (running && t % 6 === 0) onCpuDiskRequest(os, running)
+
+  // —— 资源：银行家算法（后端引擎判定，进程驱动资源请求/释放）——
+  if (t % 5 === 0) await serveBankerRequest(os)
+
+  // —— 设备：磁盘驱动调度（后端引擎返回本周期服务结果）——
+  if (os.disk.queue.length && t % 2 === 0) await serveDisk(os)
+
+  // —— 同步：生产者-消费者（进程驱动 PV，不再随机）——
+  stepSync(os, running)
+
+  // —— 指标聚合 ——
+  recomputeRuntimeMetrics(os)
   // —— 因果联动：运行进程驱动一切（可能被动态调度替换）——
   const active = os.processes.find(p => p.state === '运行') || running
   if (active) {
