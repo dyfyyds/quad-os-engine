@@ -123,6 +123,9 @@ function buildDisk(config) {
     totalSeek: 0,         // 累计移臂距离（柱面）
     served: 0,
     servedLog: [],        // 最近服务记录（进程名/柱面/磁道/记录/寻道）
+    busyUntil: 0,         // 磁盘忙到哪个虚拟时刻
+    busyLog: [],          // 最近服务区间：{ start, end, serviceTime, processName }
+    busyRate: 0,          // 最近窗口磁盘忙碌率
   }
 }
 
@@ -135,11 +138,11 @@ export function seedState(cfg) {
   const disk = buildDisk(config)
 
   const processes = [
-    { pid: 1, name: 'init', state: '运行', arrival: 0, burst: 12, ran: 3, priority: 1 },
-    { pid: 2, name: 'shell', state: '就绪', arrival: 1, burst: 6, ran: 0, priority: 2 },
-    { pid: 3, name: 'editor', state: '就绪', arrival: 2, burst: 9, ran: 0, priority: 4 },
-    { pid: 4, name: 'logger', state: '阻塞', arrival: 3, burst: 5, ran: 2, priority: 2 },
-    { pid: 5, name: 'daemon', state: '就绪', arrival: 4, burst: 7, ran: 0, priority: 3 },
+    { pid: 1, name: 'init', state: '运行', arrival: 0, burst: 12, ran: 0, priority: 1 },
+    { pid: 2, name: 'shell', state: '新建', arrival: 1, burst: 6, ran: 0, priority: 2 },
+    { pid: 3, name: 'editor', state: '新建', arrival: 2, burst: 9, ran: 0, priority: 4 },
+    { pid: 4, name: 'logger', state: '新建', arrival: 3, burst: 5, ran: 0, priority: 2 },
+    { pid: 5, name: 'daemon', state: '新建', arrival: 4, burst: 7, ran: 0, priority: 3 },
   ]
   const used = memory.frames.filter((x) => x !== null).length
   const memUtil = Math.round((used / memory.capacity) * 100)
@@ -151,7 +154,7 @@ export function seedState(cfg) {
 
     // —— 处理机核心 ——
     processes,
-    gantt: [{ 作业: 'init', 开始: 0, 结束: 3 }],
+    gantt: [],
     nextPid: 6,
 
     // —— 存储核心 ——
@@ -181,13 +184,13 @@ export function seedState(cfg) {
 
     // —— 全局指标 ——
     metrics: {
-      cpuUtil: 35, memUtil, throughput: 0, faultRate: 0,
+      cpuUtil: 0, memUtil, throughput: 0, faultRate: 0,
       avgTurnaround: 0,
       readyLen: processes.filter((p) => p.state === '就绪').length,
       blockedLen: processes.filter((p) => p.state === '阻塞').length,
       diskQueueLen: disk.queue.length, completed: 0,
     },
-    history: { labels: [0], cpu: [35], mem: [memUtil], fault: [0], throughput: [0] },
+    history: { labels: [0], cpu: [0], mem: [memUtil], fault: [0], throughput: [0] },
 
     // —— 模拟参数（接口契约 + 可配置）——
     config,

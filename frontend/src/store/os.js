@@ -17,7 +17,7 @@ export const useOsStore = defineStore('os', {
     blockedProcs: (s) => s.processes.filter((p) => p.state === '阻塞'),
     doneProcs: (s) => s.processes.filter((p) => p.state === '完成'),
     stateDist: (s) => {
-      const d = { 运行: 0, 就绪: 0, 阻塞: 0, 完成: 0 }
+      const d = { 新建: 0, 运行: 0, 就绪: 0, 阻塞: 0, 完成: 0 }
       s.processes.forEach((p) => { d[p.state] = (d[p.state] || 0) + 1 })
       return d
     },

@@ -35,7 +35,7 @@
         <SectionCard title="内存占用"><GaugePanel :value="os.metrics.memUtil" label="MEM" color="#3b82f6" /></SectionCard>
       </el-col>
       <el-col :span="6">
-        <SectionCard title="磁盘队列负载"><GaugePanel :value="diskLoad" label="DISK" color="#8b5cf6" /></SectionCard>
+        <SectionCard title="磁盘忙碌率"><GaugePanel :value="diskLoad" label="DISK" color="#8b5cf6" /></SectionCard>
       </el-col>
       <el-col :span="6">
         <SectionCard title="四核心健康度" icon="Cpu">
@@ -106,6 +106,7 @@ const trendSeries = computed(() => [
 const stateData = computed(() => {
   const d = os.stateDist
   return [
+    { name: '新建', value: d.新建, color: '#94a3b8' },
     { name: '运行', value: d.运行, color: '#15a98a' },
     { name: '就绪', value: d.就绪, color: '#3b82f6' },
     { name: '阻塞', value: d.阻塞, color: '#f0a020' },
@@ -113,7 +114,7 @@ const stateData = computed(() => {
   ]
 })
 
-const diskLoad = computed(() => Math.min(100, os.disk.queue.length * 12))
+const diskLoad = computed(() => os.disk.busyRate || 0)
 
 const coreCards = computed(() => {
   const h = os.coreHealth
