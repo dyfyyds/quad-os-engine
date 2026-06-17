@@ -40,11 +40,26 @@
       <el-col :span="6">
         <SectionCard title="四核心健康度" icon="Cpu">
           <div class="core-health">
-            <div v-for="c in coreCards" :key="c.path" class="ch-row" @click="$router.push(c.path)">
-              <el-icon :style="{ color: c.color }"><component :is="c.icon" /></el-icon>
-              <span class="ch-name">{{ c.name }}</span>
-              <el-progress :percentage="c.health" :stroke-width="8" :color="c.color" style="flex:1" />
-            </div>
+            <el-tooltip
+              v-for="c in coreCards" :key="c.path"
+              placement="left" :show-after="200" effect="light">
+              <template #content>
+                <div class="health-tip">
+                  <div class="health-tip-head"><b>{{ c.name }}</b> · 当前 {{ c.health }} 分</div>
+                  <ul>
+                    <li v-for="(r, i) in c.reasons" :key="i" :class="{ neg: r.delta < 0, pos: r.delta > 0 }">
+                      <span>{{ r.label }}</span>
+                      <span class="health-delta">{{ r.delta === 0 ? '—' : (r.delta > 0 ? '+' + r.delta : r.delta) }}</span>
+                    </li>
+                  </ul>
+                </div>
+              </template>
+              <div class="ch-row" @click="$router.push(c.path)">
+                <el-icon :style="{ color: c.color }"><component :is="c.icon" /></el-icon>
+                <span class="ch-name">{{ c.name }}</span>
+                <el-progress :percentage="c.health" :stroke-width="8" :color="c.color" style="flex:1" />
+              </div>
+            </el-tooltip>
           </div>
         </SectionCard>
       </el-col>
@@ -119,10 +134,10 @@ const diskLoad = computed(() => os.disk.busyRate || 0)
 const coreCards = computed(() => {
   const h = os.coreHealth
   return [
-    { name: '处理机', path: '/core/processor', icon: 'Cpu', color: '#15a98a', health: h.processor },
-    { name: '存储', path: '/core/memory', icon: 'Coin', color: '#3b82f6', health: h.memory },
-    { name: '资源', path: '/core/resource', icon: 'Share', color: '#8b5cf6', health: h.resource },
-    { name: '设备', path: '/core/device', icon: 'Files', color: '#f0a020', health: h.device },
+    { name: '处理机', path: '/core/processor', icon: 'Cpu',   color: '#15a98a', health: h.processor, reasons: h.processorReasons },
+    { name: '存储',   path: '/core/memory',    icon: 'Coin',  color: '#3b82f6', health: h.memory,    reasons: h.memoryReasons },
+    { name: '资源',   path: '/core/resource',  icon: 'Share', color: '#8b5cf6', health: h.resource,  reasons: h.resourceReasons },
+    { name: '设备',   path: '/core/device',    icon: 'Files', color: '#f0a020', health: h.device,    reasons: h.deviceReasons },
   ]
 })
 </script>
@@ -135,4 +150,14 @@ const coreCards = computed(() => {
 .snap li { display: flex; justify-content: space-between; align-items: center; padding: 9px 2px; border-bottom: 1px solid #f1f4f8; font-size: 13px; }
 .snap li span { color: var(--qos-muted); }
 .snap li b { color: var(--qos-text); }
+</style>
+<style>
+/* tooltip 内容样式（el-tooltip 内容渲染在外部，故不能 scoped）*/
+.health-tip { min-width: 200px; font-size: 12px; }
+.health-tip-head { font-size: 13px; margin-bottom: 6px; color: #1a2436; }
+.health-tip ul { list-style: none; margin: 0; padding: 0; }
+.health-tip li { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; color: #5b6776; }
+.health-tip li.neg { color: #e64a45; }
+.health-tip li.pos { color: #15a98a; }
+.health-tip .health-delta { font-weight: 600; font-variant-numeric: tabular-nums; }
 </style>

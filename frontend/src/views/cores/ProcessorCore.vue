@@ -95,19 +95,29 @@
             <span v-if="!os.readyProcs.length" class="empty">空</span>
           </div>
         </SectionCard>
-        <SectionCard title="I/O 阻塞队列（等待磁盘）" icon="Lock">
+        <SectionCard title="缺页等待队列（存储中断）" icon="Picture" style="margin-bottom: 14px;">
+          <div v-if="!pageFaultDetails.length" class="queue">
+            <span class="empty">无缺页等待</span>
+          </div>
+          <ul v-else class="io-block-list">
+            <li v-for="d in pageFaultDetails" :key="d.name">
+              <el-tag type="danger" effect="plain">{{ d.name }}</el-tag>
+              <span class="io-meta">
+                <span>等待页号 <b>{{ d.page }}</b></span>
+                <span class="page-wait">已等待 {{ d.waited }} 拍 / 共 4 拍</span>
+              </span>
+            </li>
+          </ul>
+        </SectionCard>
+        <SectionCard title="I/O 阻塞队列（设备中断 · 等待磁盘）" icon="Lock">
           <div v-if="!ioBlockedDetails.length" class="queue">
-            <span class="empty">无阻塞进程</span>
-        <SectionCard title="阻塞队列" icon="Lock">
-          <div class="queue">
-            <el-tooltip v-for="p in os.blockedProcs" :key="p.pid" :content="p.blockedReason || '阻塞中'" placement="top">
-              <el-tag type="warning" effect="plain">{{ p.name }}</el-tag>
-            </el-tooltip>
-            <span v-if="!os.blockedProcs.length" class="empty">空</span>
+            <span class="empty">无 I/O 阻塞</span>
           </div>
           <ul v-else class="io-block-list">
             <li v-for="d in ioBlockedDetails" :key="d.name">
-              <el-tag type="warning" effect="plain">{{ d.name }}</el-tag>
+              <el-tooltip :content="d.reason || '阻塞中'" placement="top">
+                <el-tag type="warning" effect="plain">{{ d.name }}</el-tag>
+              </el-tooltip>
               <span class="io-meta">
                 <span>等待柱面 <b>{{ d.cyl }}</b></span>
                 <span class="dist">距磁头 {{ d.dist }} 柱</span>
@@ -132,17 +142,32 @@ const os = useOsStore()
 
 const newProcs = computed(() => os.processes.filter((p) => p.state === '新建'))
 
-// I/O 阻塞队列详情：从阻塞进程关联到 disk.queue 中的 I/O 请求，显示等待的柱面和距磁头距离。
-const ioBlockedDetails = computed(() => {
-  return os.blockedProcs.map((p) => {
-    const req = os.disk.queue.find((r) => r.进程名 === p.name)
-    if (!req) return { name: p.name, cyl: '—', dist: '—' }
-    return {
+// 缺页等待队列：state=阻塞 且 pageWaitingFor !== null —— 源于"存储中断"，等待页面装入主存
+const pageFaultDetails = computed(() => {
+  return os.processes
+    .filter((p) => p.state === '阻塞' && p.pageWaitingFor !== null && p.pageWaitingFor !== undefined)
+    .map((p) => ({
       name: p.name,
-      cyl: req.柱面号,
-      dist: Math.abs(req.柱面号 - os.disk.head),
-    }
-  })
+      page: p.pageWaitingFor,
+      waited: p.blockedAt != null ? Math.max(0, os.clock - p.blockedAt) : 0,
+    }))
+})
+
+// I/O 阻塞队列：仅取 disk.ioBlocked 中的进程 —— 源于"设备中断"，等待磁盘驱动调度
+const ioBlockedDetails = computed(() => {
+  const blockedNames = new Set(os.disk.ioBlocked || [])
+  return os.processes
+    .filter((p) => p.state === '阻塞' && blockedNames.has(p.name))
+    .map((p) => {
+      const req = os.disk.queue.find((r) => r.进程名 === p.name)
+      const base = { name: p.name, reason: p.blockedReason || '等待磁盘 I/O' }
+      if (!req) return { ...base, cyl: '—', dist: '—' }
+      return {
+        ...base,
+        cyl: req.柱面号,
+        dist: Math.abs(req.柱面号 - os.disk.head),
+      }
+    })
 })
 
 const ganttReveal = computed(() => {
@@ -228,6 +253,7 @@ const ganttReveal = computed(() => {
 }
 .io-meta b { color: #1a2436; font-weight: 600; }
 .io-meta .dist { color: #8b5cf6; }
+.io-meta .page-wait { color: #e64a45; }
 .block-reason { color: #e64a45; font-size: 12px; font-weight: 500; }
 .no-reason { color: #b3bccd; }
 </style>
