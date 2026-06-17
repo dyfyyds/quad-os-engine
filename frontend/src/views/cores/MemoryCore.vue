@@ -3,10 +3,9 @@
     <div class="qos-page-head">
       <h2 class="qos-page-title">存储管理核心</h2>
       <p class="qos-page-sub">
-        分页式虚拟存储 · 修改位/访问位/外存地址 · 缺页置换 —— 当前置换算法：{{ os.config.pageAlgo }}
+        分页式虚拟存储 · 地址转换（页号×块长+单元号）· 访问位/修改位/外存地址 · 缺页置换 —— 当前置换算法：{{ os.config.pageAlgo }}
         <el-tag :type="modeTagType" effect="plain" size="small" round>{{ modeLabel }}</el-tag>
       </p>
-      <p class="qos-page-sub">分页式虚拟存储 · 地址转换（页号×块长+单元号）· 缺页置换 —— 当前置换算法：{{ os.config.pageAlgo }}（置换引擎）</p>
     </div>
 
     <el-alert v-if="os.memory.backendError" class="mode-alert" type="warning" show-icon :closable="false">
@@ -126,7 +125,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useOsStore } from '../../store/os'
 import { api } from '../../api/client'
 import StatCard from '../../components/widgets/StatCard.vue'
@@ -141,10 +140,12 @@ const modeTagType = computed(() => (os.memory.backendMode === 'backend' ? 'succe
 const translateLoading = ref(false)
 const translateError = ref('')
 const translateResults = ref([])
+// 地址转换表单的"块长"初始与系统配置保持一致；用户在系统设置修改块长后自动同步
 const translateForm = reactive({
-  blockSize: 128,
+  blockSize: os.config.blockSize || 128,
   instructionText: '+,0,70\n存,3,21\n取,6,40',
 })
+watch(() => os.config.blockSize, (v) => { if (v) translateForm.blockSize = v })
 
 const swapOutText = computed(() => {
   const r = lr.value
