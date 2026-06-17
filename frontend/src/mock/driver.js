@@ -832,6 +832,9 @@ async function tick(os) {
   os.metrics.memUtil = Math.round((used / os.memory.capacity) * 100)
   os.metrics.diskQueueLen = os.disk.queue.length
   os.metrics.faultRate = refs ? Math.round((os.memory.faults / refs) * 100) : 0
+  // 实时重算就绪/阻塞计数（applyMemoryStep 可能已改变进程状态）
+  os.metrics.readyLen = os.processes.filter((p) => p.state === '就绪').length
+  os.metrics.blockedLen = os.processes.filter((p) => p.state === '阻塞').length
   os.recordHistory()
 }
 
