@@ -30,8 +30,12 @@ let memFallbackNotified = false
 // —— 资源：银行家 ——
 let bankerBusy = false
 let bankerFallbackNotified = false
-const rand = (a, b) => a + Math.random() * (b - a)
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
+const JOB_NAMES = ['gcc', 'vim', 'sync', 'cron', 'http', 'db']
+const DISK_BUSY_WINDOW = 10
+
+function clampIndex(n, len) {
+  return len ? ((n % len) + len) % len : 0
+}
 
 // ———————————————————————— 处理机：后端调度 trace 准备与回放 ————————————————————————
 function cpuJobs(os) {
@@ -189,23 +193,6 @@ async function prepareCpuTrace(os) {
   return cpuTracePromise
 }
 
-function ranUntil(name, time, gantt) {
-  return gantt.reduce((sum, seg) => {
-    if (seg.作业 !== name) return sum
-    return sum + Math.max(0, Math.min(time, seg.结束) - seg.开始)
-  }, 0)
-}
-
-function visibleGanttUntil(gantt, time) {
-  return gantt
-    .filter((seg) => seg.开始 < time)
-    .map((seg) => ({
-      ...seg,
-      结束: Math.min(seg.结束, time),
-    }))
-    .filter((seg) => seg.结束 > seg.开始)
-}
-
 function applyCpuTrace(os) {
   const trace = cpuTrace
   const fullGantt = trace?.final_state?.甘特图 || []
@@ -213,35 +200,111 @@ function applyCpuTrace(os) {
 
   const time = os.clock
   const runningSeg = fullGantt.find((seg) => seg.开始 <= time && time < seg.结束) || null
-  const runningName = runningSeg?.作业 || null
-  os.gantt = visibleGanttUntil(fullGantt, time)
+  const ganttName = runningSeg?.作业 || null  // CPU trace 的"理论应跑"提示，仅用于优先选运行
+  // 注意：os.gantt 不再从离线 trace 切片 —— 改由 tick 主循环按实际运行进程累加（见 tick）。
 
+  // —— I/O 完成协调器（单一入口）——
+  // 磁盘服务把请求从 disk.queue 移除后，凡是仍挂在 ioBlocked 但已无对应请求的进程，
+  // 一律视为 I/O 完成 → 解除阻塞 → 重新进入就绪队列。
+  // 这样保证：阻塞 → 就绪 的转换永远不会卡死，且事件只来自一处。
+  const queueNames = new Set(os.disk.queue.map((r) => r.进程名))
+  // justUnblocked：本 tick 刚解除阻塞的进程，本拍只能停留在「就绪」，
+  // 下一 tick 才允许被调度运行 —— 保证 UI 看得到"阻塞→就绪→运行"过渡，
+  // 也避免单 tick 内压缩出"解阻塞→运行→新阻塞"导致进度跳变。
+  const justUnblocked = new Set()
+  for (let i = os.disk.ioBlocked.length - 1; i >= 0; i--) {
+    const name = os.disk.ioBlocked[i]
+    if (!queueNames.has(name)) {
+      os.disk.ioBlocked.splice(i, 1)
+      const proc = os.processes.find((p) => p.name === name)
+      if (proc && proc.state === '阻塞') {
+        proc.state = '就绪'
+        proc.blockedReason = ''
+        justUnblocked.add(name)
+        os.pushEvent('I/O完成', 'device', 'info',
+          `${name} I/O 完成 → 解除阻塞，重新加入就绪队列`)
+      }
+    }
+  }
+
+  // I/O 阻塞列表（已被协调器同步过）
+  const ioBlocked = os.disk.ioBlocked || []
+
+  // 第一轮：完成态 / 新建态 / 新建→就绪 转换
+  // 注意：ran 不再从 CPU trace 甘特图推算（甘特图是离线理论轨迹，不感知 I/O 阻塞）。
+  // ran 由 tick 主循环对"真正运行的进程"显式累加，阻塞期自动冻结，进度反映实际执行。
+  // 完成判定也改为基于实际 ran：ran >= burst → 完成。
   os.processes.forEach((p) => {
-    const detail = details.find((d) => d.作业 === p.name)
-    p.ran = Math.min(p.burst, ranUntil(p.name, time, fullGantt))
-    if (detail?.完成 !== undefined && detail.完成 <= time) p.state = '完成'
-    else if (p.name === runningName) p.state = '运行'
-    else if (time < p.arrival) p.state = '新建'
-    else p.state = '就绪'
+    if (p.ran >= p.burst && p.burst > 0) {
+      if (p.state !== '完成') {
+        p.state = '完成'
+        os.pushEvent('进程完成', 'processor', 'info',
+          `${p.name}(P${p.pid}) 服务时间用尽 → 完成`)
+      }
+    } else if (time < p.arrival) {
+      p.state = '新建'
+    } else if (p.state === '新建' && time >= p.arrival) {
+      p.state = '就绪'
+      os.pushEvent('作业就绪', 'processor', 'info',
+        `${p.name}(P${p.pid}) 到达 → 「新建」转「就绪」加入就绪队列`)
+    }
   })
 
-  if (runningName && runningName !== lastCpuRunning) {
-    const proc = os.processes.find((p) => p.name === runningName)
-    os.pushEvent('进程调度', 'processor', 'info', `${os.config.schedAlgo} 调度器选中 ${runningName}${proc ? `(P${proc.pid})` : ''} 占用 CPU`)
+  // 第二轮：独立调度器 —— 三步决定运行/就绪/阻塞
+  //   步骤 1：I/O 阻塞列表中的进程 → 强制「阻塞」
+  //   步骤 2：清除上一时刻的「运行」残留 —— 所有非阻塞非完成非新建的进程一律先标为「就绪」
+  //   步骤 3：选运行者 —— gantt 选中者优先，否则从就绪队列挑一个
+
+  // 1. ioBlocked → 阻塞
+  os.processes.forEach((p) => {
+    if (ioBlocked.includes(p.name) && p.state !== '完成' && p.state !== '新建') {
+      p.state = '阻塞'
+    }
+  })
+
+  // 2. 清运行残留：所有已到达、非阻塞非完成非新建的进程统一回「就绪」队列等待调度
+  os.processes.forEach((p) => {
+    if (p.state !== '阻塞' && p.state !== '完成' && p.state !== '新建' && time >= p.arrival) {
+      p.state = '就绪'
+    }
+  })
+
+  // 3. 选运行：gantt 优先（仅当该进程当前处于「就绪」且非本 tick 刚解除阻塞），
+  //    否则从就绪队列挑首个（同样跳过 justUnblocked）。
+  //    "本 tick 刚解除阻塞 → 留在就绪，下 tick 才能跑" —— 单 tick 内不发生压缩。
+  const ganttProc = ganttName ? os.processes.find((p) => p.name === ganttName) : null
+  if (ganttProc && ganttProc.state === '就绪' && !justUnblocked.has(ganttProc.name)) {
+    ganttProc.state = '运行'
+  } else {
+    const candidate = os.processes.find(
+      (p) => p.state === '就绪' && !justUnblocked.has(p.name)
+    )
+    if (candidate) {
+      candidate.state = '运行'
+      os.pushEvent('主动调度', 'processor', 'info',
+        `CPU 空闲 → 从就绪队列调度 ${candidate.name}(P${candidate.pid}) 运行`)
+    }
   }
-  lastCpuRunning = runningName
 
-  details
-    .filter((d) => d.完成 === time)
-    .forEach((d) => os.pushEvent('进程完成', 'processor', 'info', `进程 ${d.作业} 执行完毕，周转 ${d.周转}`))
+  // 进程调度事件
+  const currentRunning = os.processes.find(p => p.state === '运行')
+  const currentRunningName = currentRunning?.name || null
+  if (currentRunningName && currentRunningName !== lastCpuRunning) {
+    os.pushEvent('进程调度', 'processor', 'info',
+      `${currentRunning.name}(P${currentRunning.pid}) 占用 CPU`)
+  }
+  lastCpuRunning = currentRunningName
 
-  const completed = details.filter((d) => d.完成 !== undefined && d.完成 <= time)
-  os.metrics.completed = completed.length
+  // 完成统计 / 指标聚合 —— 基于实际状态（不再依赖 trace 的离线完成时间）
+  const doneProcs = os.processes.filter((p) => p.state === '完成')
+  os.metrics.completed = doneProcs.length
   os.metrics.readyLen = os.processes.filter((p) => p.state === '就绪').length
   os.metrics.blockedLen = os.processes.filter((p) => p.state === '阻塞').length
-  os.metrics.throughput = +(completed.length / Math.max(1, time)).toFixed(2)
-  os.metrics.avgTurnaround = completed.length
-    ? +(completed.reduce((sum, d) => sum + (d.周转 || 0), 0) / completed.length).toFixed(2)
+  os.metrics.throughput = +(doneProcs.length / Math.max(1, time)).toFixed(2)
+  // 实际周转 = 完成时刻 - 到达时刻（仅对已完成进程）
+  const turnarounds = doneProcs.map((p) => (p.finishTime ?? time) - p.arrival)
+  os.metrics.avgTurnaround = turnarounds.length
+    ? +(turnarounds.reduce((s, t) => s + t, 0) / turnarounds.length).toFixed(2)
     : 0
 
   return os.processes.find((p) => p.state === '运行') || null
@@ -252,15 +315,44 @@ function onCpuMemoryAccess(os, runningProc) {
   applyMemoryStep(os)
 }
 
-// CPU 运行期发起一次磁盘 I/O —— 请求挂上当前运行进程名（CPU → 设备 因果联动）
+// I/O 概率：按进程类型区分 I/O 密集 vs CPU 密集
+const IO_PROB = {
+  // I/O 密集型
+  vim: 0.25,   // 编辑器：频繁等待键盘输入
+  http: 0.20,  // Web 服务：频繁等待网络请求
+  db: 0.25,    // 数据库：频繁读写磁盘
+  sync: 0.15,  // 同步进程：有一定 I/O
+  // CPU 密集型
+  cron: 0.03,  // 定时任务：CPU 密集
+  gcc: 0.03,   // 编译器：CPU 密集
+  init: 0.01,  // 系统初始化：极少 I/O
+  shell: 0.05, // 命令行：偶尔 I/O
+  logger: 0.10, // 日志进程：频繁写磁盘
+  daemon: 0.08, // 守护进程：中等 I/O
+}
+function getIoProb(name) {
+  const prefix = name.replace(/\d+$/, '')  // 'gcc6' → 'gcc'
+  return IO_PROB[prefix] ?? IO_PROB.default
+}
+
+// CPU 运行期发起一次磁盘 I/O —— 按进程类型概率触发，进程立即进入 I/O 阻塞态
 function onCpuDiskRequest(os, runningProc) {
   const d = os.disk
   if (d.queue.length >= 8) return
+  if (Math.random() >= getIoProb(runningProc.name)) return  // 按类型概率决定是否 I/O
   const req = makeRequest(os)
-  if (runningProc) req.进程名 = runningProc.name
+  if (runningProc) {
+    req.进程名 = runningProc.name
+  }
   d.queue.push(req)
+  // 进程因 I/O 请求立即进入阻塞态（当 tick 生效，不再占用 CPU）
+  if (runningProc && !d.ioBlocked.includes(runningProc.name)) {
+    d.ioBlocked.push(runningProc.name)
+    runningProc.state = '阻塞'  // 当 tick 立即生效
+    runningProc.blockedReason = `等待磁盘 I/O - 柱面 ${req.柱面号} 磁道 ${req.磁道号} 记录 ${req.物理记录号}`
+  }
   os.pushEvent('I/O请求', 'device', 'info',
-    `${req.进程名} 发起 I/O：柱面 ${req.柱面号}/磁道 ${req.磁道号}/记录 ${req.物理记录号}`)
+    `${req.进程名} 发起 I/O → 进入阻塞态：柱面 ${req.柱面号}/磁道 ${req.磁道号}/记录 ${req.物理记录号}`)
 }
 
 // ———————————————————————— 存储：分页置换（接入后端引擎）————————————————————————
@@ -378,17 +470,20 @@ function applyMemoryStep(os) {
   const m = os.memory
   const trace = memTrace
   if (!trace || !trace.steps?.length) return
-  const step = trace.steps[m.refPtr % trace.steps.length].state
+  // refPtr 取模循环：访问串到尾后重头开始，保证演示可持续推进；
+  // hits/faults 累计不重置，反映"程序持续访问、缺页持续发生"的真实语义。
+  const stepIdx = m.refPtr % trace.steps.length
+  const step = trace.steps[stepIdx].state
   m.refPtr++
-  m.traceCursor = (m.refPtr - 1) % trace.steps.length   // 揭示游标 → 当前步（MemoryCore「分步执行过程」据此逐步显示）
+  m.traceCursor = stepIdx   // 揭示游标 → 当前步（按 trace 内位置取，循环时游标也循环）
 
   const page = step.引用页
   const hit = step.命中
   const evicted = step.换出页 ?? null
   const now = os.clock
-  const willWrite = Math.random() < 0.4   // 约四成访问为写 → 置「修改位」
   const blockSize = os.config.blockSize || 128
-  const unit = Math.floor(Math.random() * blockSize)   // 页内单元号（偏移）—— 地址转换用
+  const willWrite = ((page + now + m.refPtr) % 5) < 2   // 固定比例写访问 → 置「修改位」
+  const unit = (page * 31 + now * 17 + m.refPtr * 7) % blockSize   // 页内单元号（偏移）—— 地址转换用
 
   // 写回判定须在重建页表之前读取被淘汰页的修改位
   const wroteBack = !hit && evicted !== null && m.pageTable[evicted]
@@ -431,17 +526,69 @@ function applyMemoryStep(os) {
     绝对地址: absAddr,        // 命中 → 直接得址；缺页 → 装入后重试得址
   }
 
-  // 仅缺页推事件（命中的实时绝对地址在「最近访存」面板呈现，避免刷屏）
+  // —— 缺页中断 → 阻塞当前运行进程（存储 → 调度 因果闭环）——
+  const runningProc = os.processes.find((p) => p.state === '运行')
   if (!hit) {
     const detail = evicted === null
       ? `装入空闲块 ${slot}`
       : `调出页 ${evicted}${wroteBack ? '(已修改,写回外存)' : ''}，装入页 ${page} → 主存块 ${slot}`
     os.pushEvent('缺页中断', 'memory', 'warning',
       `访问 [页 ${page} 单元 ${unit}] 缺页中断 *${page} —— ${detail}（装入后绝对地址 ${absAddr}）`)
+
+    if (runningProc) {
+      runningProc.state = '阻塞'
+      runningProc.blockedReason = `缺页等待: 页${page}`
+      runningProc.pageWaitingFor = page
+      runningProc.blockedAt = now
+      os.pushEvent('进程阻塞', 'memory', 'warning',
+        `${runningProc.name}(P${runningProc.pid}) 因缺页中断阻塞，等待页 ${page} 装入主存`)
+    }
   }
+
+  // —— 统一智能唤醒：扫描所有缺页阻塞进程，若其等待页已在新 frames 快照中，立即解阻塞 ——
+  // 适用三种情形：① 缺页路径下，被换入的就是它等的页；② 命中路径下，目标页就在内存；
+  //              ③ 别的进程缺页换入了它正在等的页（连锁唤醒）。
+  // 当前 runningProc 若刚因本次缺页阻塞，page 已在 frames 里——它的 pageWaitingFor === page，
+  // 但我们希望保留 4 拍"缺页处理耗时"语义，所以不立即唤醒自己（pageWaitingFor 等于当前 page 且 blockedAt === now 的跳过）。
+  const inMem = new Set(snap.filter((x) => x !== null))
+  os.processes.forEach((p) => {
+    if (p.state !== '阻塞' || p.pageWaitingFor == null) return
+    if (p === runningProc && p.blockedAt === now) return   // 当前刚阻塞的进程保留至少 1 拍
+    if (inMem.has(p.pageWaitingFor)) {
+      p.state = '就绪'
+      p.blockedReason = ''
+      p.pageWaitingFor = null
+      p.blockedAt = null
+      os.pushEvent('进程唤醒', 'memory', 'info',
+        `${p.name}(P${p.pid}) 所等待页已在主存，唤醒回就绪队列`)
+    }
+  })
 }
 
 // ———————————————————————— 设备：磁盘驱动调度（接入真实后端引擎）————————————————————————
+
+function recordDiskBusy(os, processName, serviceTime) {
+  const d = os.disk
+  const normalized = Math.max(1, Number(serviceTime) || 1)
+  const start = Math.max(os.clock, d.busyUntil || 0)
+  const end = start + normalized
+  d.busyUntil = end
+  d.busyLog.push({ start, end, serviceTime: normalized, processName })
+  const keepFrom = os.clock - DISK_BUSY_WINDOW * 3
+  d.busyLog = d.busyLog.filter((seg) => seg.end >= keepFrom)
+}
+
+function recomputeDiskBusyRate(os) {
+  const d = os.disk
+  const windowEnd = os.clock
+  const windowStart = windowEnd - DISK_BUSY_WINDOW
+  const busyTime = d.busyLog.reduce((sum, seg) => {
+    const overlap = Math.max(0, Math.min(seg.end, windowEnd) - Math.max(seg.start, windowStart))
+    return sum + overlap
+  }, 0)
+  d.busyRate = Math.min(100, Math.round((busyTime / DISK_BUSY_WINDOW) * 100))
+  d.busyLog = d.busyLog.filter((seg) => seg.end >= windowStart)
+}
 
 /**
  * 接入后端 /api/disk/simulate 进行完整 I/O 模拟（移臂 + 旋转 + 传输）。
@@ -473,6 +620,7 @@ async function serveDisk(os) {
       const st = first.state
       const seek = st['寻道距离']
       const servedName = st['进程名']
+      const serviceTime = st['服务时间']
 
       // 更新磁头位置
       d.head = st['目标柱面']
@@ -489,9 +637,13 @@ async function serveDisk(os) {
       if (idx >= 0) {
         const req = d.queue.splice(idx, 1)[0]
         d.served++
-        d.servedLog.unshift({ ...req, 寻道: seek, ts: os.clock })
+        recordDiskBusy(os, servedName, serviceTime)
+        d.servedLog.unshift({ ...req, 寻道: seek, 服务时间: serviceTime, ts: os.clock })
         if (d.servedLog.length > 8) d.servedLog.pop()
       }
+
+      // 注意：「阻塞→就绪」的解除统一由 applyCpuTrace 开头的 I/O 完成协调器处理，
+      // 此处不再操作 ioBlocked 或进程状态，避免事件重复与时序竞态。
 
       os.pushEvent('驱动调度', 'device', 'info',
         `${servedName}：移臂至柱面 ${d.head}(寻道 ${seek}) → 旋转至记录 ${d.currentRecord} (服务时间 ${st['服务时间']})`)
@@ -517,6 +669,7 @@ function serveDiskLocal(os) {
   })
   const req = d.queue[bi]
   const seek = Math.abs(req.柱面号 - d.head)
+  const serviceTime = seek + 1
   d.totalSeek += seek
   d.head = req.柱面号
   d.currentRecord = req.物理记录号
@@ -524,19 +677,23 @@ function serveDiskLocal(os) {
   if (d.path.length > 30) d.path.shift()
   d.queue.splice(bi, 1)
   d.served++
-  d.servedLog.unshift({ ...req, 寻道: seek, ts: os.clock })
+  recordDiskBusy(os, req.进程名, serviceTime)
+  d.servedLog.unshift({ ...req, 寻道: seek, 服务时间: serviceTime, ts: os.clock })
   if (d.servedLog.length > 8) d.servedLog.pop()
+  // 注意：「阻塞→就绪」由 applyCpuTrace 开头的 I/O 完成协调器统一处理（同 serveDisk）。
   os.pushEvent('驱动调度', 'device', 'info',
     `${req.进程名}：移臂至柱面 ${req.柱面号}(寻道 ${seek}) → 旋转至记录 ${req.物理记录号} [本地]`)
 }
 
 function makeRequest(os) {
   const d = os.disk
+  const pid = os.runningProc?.pid || os.nextPid || 1
+  const t = os.clock
   return {
-    进程名: os.processes.length ? pick(os.processes).name : 'job',
-    柱面号: Math.round(rand(0, d.cylinders - 1)),
-    磁道号: Math.round(rand(0, d.tracksPerCyl - 1)),
-    物理记录号: Math.round(rand(0, d.recordsPerTrack - 1)),
+    进程名: os.runningProc?.name || `job${pid}`,
+    柱面号: (pid * 37 + t * 11 + d.served * 5) % d.cylinders,
+    磁道号: (pid + t + d.queue.length) % d.tracksPerCyl,
+    物理记录号: (pid * 3 + t + d.currentRecord) % d.recordsPerTrack,
   }
 }
 
@@ -615,22 +772,25 @@ async function refreshBankerSafety(os, announce = true) {
 }
 
 /**
- * 一次资源活动（fire-and-forget）：约 35% 概率随机释放已占资源，
- * 否则挑一个进程发起资源请求并按银行家判定结果落库（进程 → 资源 因果联动）。
+ * 一次资源活动：按虚拟时钟确定性释放或请求资源，
+ * 再由银行家算法判定并落库（进程 → 资源 因果联动）。
+ * 运行进程请求资源（因果联动：CPU 调度 → 资源申请）。
+ * 请求向量 = min(Need[i], Available)，由运行进程的实际需求决定，非随机。
  */
-async function serveBankerRequest(os) {
-  if (bankerBusy) return
+async function serveBankerRequest(os, proc) {
+  if (bankerBusy || !proc) return
   bankerBusy = true
   try {
     const r = os.resources
     const n = r.allocation.length
+    const phase = Math.floor(os.clock / 5)
 
     // —— 释放：进程阶段性归还，已占资源回收（让矩阵呼吸、避免单调耗尽）——
-    if (Math.random() < 0.35) {
-      const i = Math.floor(Math.random() * n)
+    if (phase % 3 === 0) {
+      const i = clampIndex(phase, n)
       const alloc = r.allocation[i]
       if (alloc.some((v) => v > 0)) {
-        const rel = alloc.map((v) => Math.round(Math.random() * v))
+        const rel = alloc.map((v, j) => (v > 0 && (phase + j) % 2 === 0 ? 1 : 0))
         if (rel.some((v) => v > 0)) {
           r.available = r.available.map((v, j) => v + rel[j])
           r.allocation = r.allocation.map((row, ri) => (ri === i ? row.map((v, j) => v - rel[j]) : row))
@@ -642,15 +802,22 @@ async function serveBankerRequest(os) {
       }
     }
 
-    // —— 请求：构造请求向量（多数 ≤ Need，约 1/4 超额以演示等待/拒绝）——
-    const i = Math.floor(Math.random() * n)
+    // —— 请求：基于运行进程映射到银行家矩阵，aggressive 节拍化构造请求向量 ——
+    // 进程 pid → 矩阵索引；多数请求 ≤ Need，固定节拍超额以演示"申请被拒绝/等待"
+    const i = proc.pid % n
     const need = r.need[i]
-    const aggressive = Math.random() < 0.25
+    const aggressive = phase % 4 === 0
     const request = need.map((nd, j) => {
-      const hi = aggressive ? Math.max(nd, r.available[j]) + 1 : Math.min(nd, r.available[j])
-      return Math.max(0, Math.round(Math.random() * hi))
+      if (nd <= 0) return 0
+      if (aggressive && j === phase % need.length) return nd + 1  // 超额：让 banker 判定不安全
+      const hi = Math.min(nd, r.available[j])
+      return hi > 0 && (phase + j) % 2 === 0 ? 1 : 0
     })
-    if (request.every((v) => v === 0)) return  // 空请求跳过
+    if (request.every((v) => v === 0)) {
+      const j = need.findIndex((nd, idx) => nd > 0 && r.available[idx] > 0)
+      if (j >= 0) request[j] = 1
+    }
+    if (request.every((v) => v === 0)) return  // 仍空，跳过
 
     let trace
     try {
@@ -671,13 +838,32 @@ async function serveBankerRequest(os) {
       r.need = fs.Need
       r.safeSeq = fs.安全序列 || r.safeSeq
       r.deadlock = false
-      os.pushEvent('资源分配', 'resource', 'info', `P${i} 申请 [${request}] 获准，安全序列 ${(fs.安全序列 || []).join(',')}`)
+      os.pushEvent('资源分配', 'resource', 'info', `${proc.name} 申请 [${request}] 获准，安全序列 ${(fs.安全序列 || []).join(',')}`)
     } else {
-      os.pushEvent('资源请求', 'resource', 'warning', `P${i} 申请 [${request}] 未获准：${trace.metrics.原因 || '不安全 / 资源不足'}`)
+      os.pushEvent('资源请求', 'resource', 'warning', `${proc.name} 申请 [${request}] 未获准：${trace.metrics.原因 || '不安全 / 资源不足'}`)
       if ((fs.死锁进程 || []).length) r.deadlock = true
     }
   } finally {
     bankerBusy = false
+  }
+}
+
+/**
+ * 阻塞/完成进程释放全部资源（因果联动：进程阻塞 → 资源回收）。
+ * 模拟进程进入 I/O 等待期间不占计算资源。
+ */
+function releaseBankerResources(os, proc) {
+  const r = os.resources
+  const n = r.allocation.length
+  const i = proc.pid % n
+  const alloc = r.allocation[i]
+
+  if (alloc.some((v) => v > 0)) {
+    r.available = r.available.map((v, j) => v + alloc[j])
+    r.allocation[i] = alloc.map(() => 0)
+    r.need = calcNeed(r.max, r.allocation)
+    os.pushEvent('资源释放', 'resource', 'info', `${proc.name} 阻塞，释放全部资源 [${alloc}] 回收至可用池`)
+    refreshBankerSafety(os, false)
   }
 }
 
@@ -730,15 +916,76 @@ function pvConsume(s, proc, os) {
   }
 }
 
-/** 一拍同步活动：由进程驱动(运行进程偏生产)，缓冲越满越偏消费 → 自平衡且偶发阻塞/唤醒。 */
-function stepSync(os, running) {
+/**
+ * 因果同步：运行进程 → 生产者（产生数据到缓冲区）。
+ * 仅运行进程可生产，缓冲区满时阻塞。
+ */
+function syncProduce(os, running) {
+  if (!running || !running.name) return
   const s = os.sync
-  const producer = (running && running.name) || pick(os.processes)?.name || 'proc'
-  const consumer = pick(os.processes)?.name || 'proc'
+  if (s.buffer >= s.capacity) return  // 缓冲满，跳过（不主动阻塞运行进程）
+  pvProduce(s, running.name, os)
+}
+
+/**
+ * 因果同步：阻塞进程被唤醒 → 消费者（从缓冲区取数据）。
+ * 仅当缓冲区有数据时消费。
+ */
+function syncConsume(os) {
+  const s = os.sync
+  const producer = (running && running.name) || os.processes[clampIndex(os.clock, os.processes.length)]?.name || 'proc'
+  const consumer = os.processes[clampIndex(os.clock + 1, os.processes.length)]?.name || 'proc'
   const fillRatio = s.buffer / Math.max(1, s.capacity)
-  const pProduce = 0.65 - 0.5 * fillRatio   // 满→0.15(仍偶尔撑满阻塞)、空→0.65
-  if (Math.random() < pProduce) pvProduce(s, producer, os)
+  const shouldProduce = s.buffer === 0 || (s.buffer < s.capacity && (os.clock + Math.round(fillRatio * 10)) % 2 === 0)
+  if (shouldProduce) pvProduce(s, producer, os)
   else pvConsume(s, consumer, os)
+  if (s.buffer <= 0) return  // 缓冲空，跳过
+  const blocked = os.processes.filter(p => p.state === '阻塞')
+  if (!blocked.length) return
+  pvConsume(s, blocked[0].name, os)
+}
+
+function addDeterministicArrival(os, t) {
+  const pid = os.nextPid++
+  const name = `${JOB_NAMES[clampIndex(pid, JOB_NAMES.length)]}${pid}`
+  os.processes.push({
+    pid,
+    name,
+    state: '就绪',
+    arrival: t,
+    burst: 4 + ((pid + t) % 7),
+    ran: 0,
+    priority: 1 + ((pid + t) % 4),
+    blockedReason: '',
+    pageWaitingFor: null,
+    blockedAt: null,
+  })
+  os.pushEvent('作业到达', 'processor', 'info', `新作业 ${name} 进入就绪队列`)
+  // 队列上限保护：超出 12 时砍掉最早一个非运行进程，避免 PCB 表无限增长
+  if (os.processes.length > 12) {
+    const idx = os.processes.findIndex((p) => p.state !== '运行')
+    if (idx >= 0) os.processes.splice(idx, 1)
+  }
+  // 清除 CPU trace 缓存，下一 tick 重算包含新作业的甘特
+  cpuTrace = null
+  cpuTraceKey = ''
+}
+
+function recomputeRuntimeMetrics(os) {
+  const used = os.memory.frames.filter((x) => x !== null).length
+  const refs = os.memory.faults + os.memory.hits
+  const busy = os.gantt.reduce((sum, seg) => sum + Math.max(0, seg.结束 - seg.开始), 0)
+  const completed = os.processes.filter((p) => p.state === '完成')
+  recomputeDiskBusyRate(os)
+
+  os.metrics.cpuUtil = os.clock ? Math.round((busy / os.clock) * 100) : 0
+  os.metrics.memUtil = Math.round((used / Math.max(1, os.memory.capacity)) * 100)
+  os.metrics.diskQueueLen = os.disk.queue.length
+  os.metrics.faultRate = refs ? Math.round((os.memory.faults / refs) * 100) : 0
+  os.metrics.readyLen = os.processes.filter((p) => p.state === '就绪').length
+  os.metrics.blockedLen = os.processes.filter((p) => p.state === '阻塞').length
+  os.metrics.completed = completed.length
+  os.metrics.throughput = +(completed.length / Math.max(1, os.clock)).toFixed(2)
 }
 
 // ———————————————————————— 主时钟步进 ————————————————————————
@@ -746,46 +993,69 @@ async function tick(os) {
   os.clock++
   const t = os.clock
 
+  // —— 新作业到达：固定节拍与固定参数，保证重置后可复现 ——
+  if (t % 7 === 0) addDeterministicArrival(os, t)
+
   // —— 处理机/存储：以后端 trace 为准逐周期回放 ——
   await prepareCpuTrace(os)
   await prepareMemoryTrace(os)
   const running = applyCpuTrace(os)
 
-  // —— 因果联动：CPU 运行的进程驱动访存 / 磁盘 I/O ——
-  if (running && Math.random() < 0.7) onCpuMemoryAccess(os, running)
-  if (running && Math.random() < 0.08) onCpuDiskRequest(os, running)
-
-  // —— 新作业到达 ——
-  if (t % 7 === 0) {
-    const pid = os.nextPid++
-    const name = `${pick(['gcc', 'vim', 'sync', 'cron', 'http', 'db'])}${pid}`
-    os.processes.push({ pid, name, state: '就绪', arrival: t, burst: Math.round(rand(4, 10)), ran: 0, priority: Math.round(rand(1, 4)) })
-    os.pushEvent('作业到达', 'processor', 'info', `新作业 ${name} 进入就绪队列`)
-    if (os.processes.length > 12) os.processes.shift()
+  // —— 因果联动：运行进程驱动一切 ——
+  // 严格顺序：① 推进 ran 与甘特（CPU 真的跑了 1 拍）→ ② 再触发可能导致阻塞的副作用
+  if (running && running.state === '运行' && running.ran < running.burst) {
+    running.ran = Math.min(running.burst, running.ran + 1)
+    // 甘特事实记录：上一段同名且首尾相接(结束===t-1) 则延伸；否则新段
+    const last = os.gantt[os.gantt.length - 1]
+    if (last && last.作业 === running.name && last.结束 === t - 1) {
+      last.结束 = t
+    } else {
+      os.gantt.push({ 作业: running.name, 开始: t - 1, 结束: t })
+      if (os.gantt.length > 40) os.gantt.shift()
+    }
+    if (running.ran >= running.burst) {
+      running.finishTime = t
+      running.state = '完成'
+      os.pushEvent('进程完成', 'processor', 'info',
+        `${running.name}(P${running.pid}) 服务时间用尽，周转 ${t - running.arrival}`)
+    }
   }
 
-  // —— 资源：银行家算法（异步调用后端引擎，进程驱动资源请求/释放）——
-  if (t % 5 === 0) serveBankerRequest(os)  // fire-and-forget
+  // 访存（CPU → 存储）：按 50% 概率触发——并非每拍都访存（CPU 也有"纯计算"拍），
+  // 避免每拍都推 trace、几拍内全员缺页阻塞 CPU 空闲
+  if (running && running.state === '运行' && Math.random() < 0.5) onCpuMemoryAccess(os, running)
+  // 磁盘 I/O（CPU → 设备）：可能因 I/O 转阻塞
+  if (running && running.state === '运行' && t % 6 === 0) onCpuDiskRequest(os, running)
+  // 资源（CPU → 银行家）：运行进程按 Need 申请
+  if (running && running.state === '运行' && t % 5 === 0) await serveBankerRequest(os, running)
+  // PV 生产（CPU → 同步）：运行进程生产数据
+  if (running && running.state === '运行' && t % 3 === 0) syncProduce(os, running)
 
-  // —— 设备：磁盘驱动调度（异步调用后端，不阻塞主时钟）——
-  if (os.disk.queue.length && t % 2 === 0) serveDisk(os)  // fire-and-forget
-  if (os.disk.queue.length < 6 && t % 6 === 0) {
-    const req = makeRequest(os)
-    os.disk.queue.push(req)
-    os.pushEvent('I/O请求', 'device', 'info', `新增 I/O 请求：${req.进程名} 柱面 ${req.柱面号}/磁道 ${req.磁道号}/记录 ${req.物理记录号}`)
+  // —— 设备：磁盘驱动调度（fire-and-forget，后端服务后由协调器解阻塞）——
+  if (os.disk.queue.length && t % 2 === 0) serveDisk(os)
+
+  // —— 阻塞进程触发资源释放 / PV 消费（让矩阵呼吸）——
+  const blocked = os.processes.filter((p) => p.state === '阻塞')
+  if (blocked.length) {
+    if (t % 4 === 0) releaseBankerResources(os, blocked[0])
+    if (t % 3 === 0) syncConsume(os)
   }
-
-  // —— 同步：生产者-消费者（进程驱动 PV，不再随机）——
-  if (Math.random() < 0.5) stepSync(os, running)
 
   // —— 指标聚合 ——
-  const used = os.memory.frames.filter((x) => x !== null).length
-  const refs = os.memory.faults + os.memory.hits
-  const target = running ? rand(72, 96) : rand(6, 18)
-  os.metrics.cpuUtil = Math.round(os.metrics.cpuUtil + (target - os.metrics.cpuUtil) * 0.45)
-  os.metrics.memUtil = Math.round((used / os.memory.capacity) * 100)
-  os.metrics.diskQueueLen = os.disk.queue.length
-  os.metrics.faultRate = refs ? Math.round((os.memory.faults / refs) * 100) : 0
+  recomputeRuntimeMetrics(os)
+
+  // —— 缺页阻塞超时唤醒（4 tick 后强制就绪，模拟缺页处理完成）——
+  os.processes.forEach((p) => {
+    if (p.state === '阻塞' && p.blockedAt && p.pageWaitingFor !== null && (t - p.blockedAt) >= 4) {
+      p.state = '就绪'
+      p.blockedReason = ''
+      p.pageWaitingFor = null
+      p.blockedAt = null
+      os.pushEvent('超时唤醒', 'memory', 'info', `${p.name}(P${p.pid}) 缺页等待超时，已自动唤醒回就绪队列`)
+    }
+  })
+
+  // —— 历史采样（指标已由 recomputeRuntimeMetrics 上方一次性聚合完成）——
   os.recordHistory()
 }
 
