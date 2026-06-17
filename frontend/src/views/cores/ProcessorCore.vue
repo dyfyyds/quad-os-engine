@@ -81,6 +81,10 @@
               <el-progress :percentage="Math.min(100, Math.round(row.ran / row.burst * 100))" :stroke-width="10" />
             </template></el-table-column>
             <el-table-column prop="priority" label="优先级" width="72" />
+            <el-table-column label="阻塞原因" min-width="140"><template #default="{ row }">
+              <span v-if="row.state === '阻塞' && row.blockedReason" class="block-reason">{{ row.blockedReason }}</span>
+              <span v-else class="no-reason">—</span>
+            </template></el-table-column>
           </el-table>
         </SectionCard>
       </el-col>
@@ -94,6 +98,12 @@
         <SectionCard title="I/O 阻塞队列（等待磁盘）" icon="Lock">
           <div v-if="!ioBlockedDetails.length" class="queue">
             <span class="empty">无阻塞进程</span>
+        <SectionCard title="阻塞队列" icon="Lock">
+          <div class="queue">
+            <el-tooltip v-for="p in os.blockedProcs" :key="p.pid" :content="p.blockedReason || '阻塞中'" placement="top">
+              <el-tag type="warning" effect="plain">{{ p.name }}</el-tag>
+            </el-tooltip>
+            <span v-if="!os.blockedProcs.length" class="empty">空</span>
           </div>
           <ul v-else class="io-block-list">
             <li v-for="d in ioBlockedDetails" :key="d.name">
@@ -218,4 +228,6 @@ const ganttReveal = computed(() => {
 }
 .io-meta b { color: #1a2436; font-weight: 600; }
 .io-meta .dist { color: #8b5cf6; }
+.block-reason { color: #e64a45; font-size: 12px; font-weight: 500; }
+.no-reason { color: #b3bccd; }
 </style>

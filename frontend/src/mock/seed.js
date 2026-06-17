@@ -145,6 +145,11 @@ export function seedState(cfg) {
     { pid: 3, name: 'editor', state: '就绪', arrival: 0, burst: 9, ran: 0, priority: 4 },
     { pid: 4, name: 'logger', state: '就绪', arrival: 0, burst: 5, ran: 0, priority: 2 },
     { pid: 5, name: 'daemon', state: '就绪', arrival: 0, burst: 7, ran: 0, priority: 3 },
+    { pid: 1, name: 'init', state: '运行', arrival: 0, burst: 12, ran: 3, priority: 1, blockedReason: '', pageWaitingFor: null, blockedAt: null },
+    { pid: 2, name: 'shell', state: '就绪', arrival: 1, burst: 6, ran: 0, priority: 2, blockedReason: '', pageWaitingFor: null, blockedAt: null },
+    { pid: 3, name: 'editor', state: '就绪', arrival: 2, burst: 9, ran: 0, priority: 4, blockedReason: '', pageWaitingFor: null, blockedAt: null },
+    { pid: 4, name: 'logger', state: '阻塞', arrival: 3, burst: 5, ran: 2, priority: 2, blockedReason: 'I/O 等待', pageWaitingFor: null, blockedAt: null },
+    { pid: 5, name: 'daemon', state: '就绪', arrival: 4, burst: 7, ran: 0, priority: 3, blockedReason: '', pageWaitingFor: null, blockedAt: null },
   ]
   const used = memory.frames.filter((x) => x !== null).length
   const memUtil = Math.round((used / memory.capacity) * 100)
