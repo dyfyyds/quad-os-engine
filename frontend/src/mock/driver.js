@@ -431,13 +431,48 @@ function applyMemoryStep(os) {
     绝对地址: absAddr,        // 命中 → 直接得址；缺页 → 装入后重试得址
   }
 
-  // 仅缺页推事件（命中的实时绝对地址在「最近访存」面板呈现，避免刷屏）
+  // —— 缺页中断 → 阻塞当前运行进程（存储 → 调度 因果闭环）——
   if (!hit) {
     const detail = evicted === null
       ? `装入空闲块 ${slot}`
       : `调出页 ${evicted}${wroteBack ? '(已修改,写回外存)' : ''}，装入页 ${page} → 主存块 ${slot}`
     os.pushEvent('缺页中断', 'memory', 'warning',
       `访问 [页 ${page} 单元 ${unit}] 缺页中断 *${page} —— ${detail}（装入后绝对地址 ${absAddr}）`)
+
+    // 阻塞当前运行的进程（模拟缺页中断处理期间进程等待）
+    const runningProc = os.processes.find((p) => p.state === '运行')
+    if (runningProc) {
+      runningProc.state = '阻塞'
+      runningProc.blockedReason = `缺页等待: 页${page}`
+      runningProc.pageWaitingFor = page
+      runningProc.blockedAt = now
+      os.pushEvent('进程阻塞', 'memory', 'warning',
+        `${runningProc.name}(P${runningProc.pid}) 因缺页中断阻塞，等待页 ${page} 装入主存`)
+    }
+
+    // 唤醒等待该页的其他就绪态进程（如果有的话——无实际效应，仅为语义完整）
+    os.processes.forEach((p) => {
+      if (p.state === '阻塞' && p.pageWaitingFor === page && p !== runningProc) {
+        p.state = '就绪'
+        p.blockedReason = ''
+        p.pageWaitingFor = null
+        p.blockedAt = null
+        os.pushEvent('进程唤醒', 'memory', 'info',
+          `${p.name}(P${p.pid}) 所等待页 ${page} 已装入主存，唤醒回就绪队列`)
+      }
+    })
+  } else {
+    // 页命中 → 唤醒所有等待此页的阻塞进程（页已在主存，可继续执行）
+    os.processes.forEach((p) => {
+      if (p.state === '阻塞' && p.pageWaitingFor === page) {
+        p.state = '就绪'
+        p.blockedReason = ''
+        p.pageWaitingFor = null
+        p.blockedAt = null
+        os.pushEvent('进程唤醒', 'memory', 'info',
+          `${p.name}(P${p.pid}) 所需页 ${page} 已在主存，唤醒回就绪队列`)
+      }
+    })
   }
 }
 
@@ -759,7 +794,7 @@ async function tick(os) {
   if (t % 7 === 0) {
     const pid = os.nextPid++
     const name = `${pick(['gcc', 'vim', 'sync', 'cron', 'http', 'db'])}${pid}`
-    os.processes.push({ pid, name, state: '就绪', arrival: t, burst: Math.round(rand(4, 10)), ran: 0, priority: Math.round(rand(1, 4)) })
+    os.processes.push({ pid, name, state: '就绪', arrival: t, burst: Math.round(rand(4, 10)), ran: 0, priority: Math.round(rand(1, 4)), blockedReason: '', pageWaitingFor: null, blockedAt: null })
     os.pushEvent('作业到达', 'processor', 'info', `新作业 ${name} 进入就绪队列`)
     if (os.processes.length > 12) os.processes.shift()
   }
@@ -778,6 +813,17 @@ async function tick(os) {
   // —— 同步：生产者-消费者（进程驱动 PV，不再随机）——
   if (Math.random() < 0.5) stepSync(os, running)
 
+  // —— 缺页阻塞超时唤醒（4 tick 后强制就绪，模拟缺页处理完成）——
+  os.processes.forEach((p) => {
+    if (p.state === '阻塞' && p.blockedAt && p.pageWaitingFor !== null && (t - p.blockedAt) >= 4) {
+      p.state = '就绪'
+      p.blockedReason = ''
+      p.pageWaitingFor = null
+      p.blockedAt = null
+      os.pushEvent('超时唤醒', 'memory', 'info', `${p.name}(P${p.pid}) 缺页等待超时，已自动唤醒回就绪队列`)
+    }
+  })
+
   // —— 指标聚合 ——
   const used = os.memory.frames.filter((x) => x !== null).length
   const refs = os.memory.faults + os.memory.hits
@@ -786,6 +832,9 @@ async function tick(os) {
   os.metrics.memUtil = Math.round((used / os.memory.capacity) * 100)
   os.metrics.diskQueueLen = os.disk.queue.length
   os.metrics.faultRate = refs ? Math.round((os.memory.faults / refs) * 100) : 0
+  // 实时重算就绪/阻塞计数（applyMemoryStep 可能已改变进程状态）
+  os.metrics.readyLen = os.processes.filter((p) => p.state === '就绪').length
+  os.metrics.blockedLen = os.processes.filter((p) => p.state === '阻塞').length
   os.recordHistory()
 }
 

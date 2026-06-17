@@ -29,6 +29,10 @@
               <el-progress :percentage="Math.min(100, Math.round(row.ran / row.burst * 100))" :stroke-width="10" />
             </template></el-table-column>
             <el-table-column prop="priority" label="优先级" width="72" />
+            <el-table-column label="阻塞原因" min-width="140"><template #default="{ row }">
+              <span v-if="row.state === '阻塞' && row.blockedReason" class="block-reason">{{ row.blockedReason }}</span>
+              <span v-else class="no-reason">—</span>
+            </template></el-table-column>
           </el-table>
         </SectionCard>
       </el-col>
@@ -41,7 +45,9 @@
         </SectionCard>
         <SectionCard title="阻塞队列" icon="Lock">
           <div class="queue">
-            <el-tag v-for="p in os.blockedProcs" :key="p.pid" type="warning" effect="plain">{{ p.name }}</el-tag>
+            <el-tooltip v-for="p in os.blockedProcs" :key="p.pid" :content="p.blockedReason || '阻塞中'" placement="top">
+              <el-tag type="warning" effect="plain">{{ p.name }}</el-tag>
+            </el-tooltip>
             <span v-if="!os.blockedProcs.length" class="empty">空</span>
           </div>
         </SectionCard>
@@ -70,4 +76,6 @@ const ganttReveal = computed(() => {
 <style scoped>
 .queue { display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px; align-items: center; }
 .queue .empty { color: #b3bccd; font-size: 12px; }
+.block-reason { color: #e64a45; font-size: 12px; font-weight: 500; }
+.no-reason { color: #b3bccd; }
 </style>
