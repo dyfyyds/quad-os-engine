@@ -15,7 +15,6 @@ import { api } from '../api/client'
  * 后端不可用时自动回退前端等价算法（一次性告警），保证纯前端可独立运行。
  */
 let timer = null
-let pagingPreparePromise = null
 let diskBusy = false  // 防止并发调用后端
 let ticking = false
 let cpuTrace = null
@@ -292,9 +291,11 @@ async function prepareMemoryTrace(os) {
       })
       memTraceKey = key
       memFallbackNotified = false
+      os.setPagingTrace(memTrace)   // 同步至 store：backend 模式 + 暴露 trace.steps 给「分步执行过程」
     } catch (e) {
       memTrace = localPagingTrace(os)
       memTraceKey = key
+      os.clearPagingTrace(e?.message || '后端分页接口不可用')   // 同步至 store：local 回退模式 + 告警
       if (!memFallbackNotified) {
         os.pushEvent('分页回退', 'memory', 'warning', `后端分页接口不可用，临时使用前端等价算法：${e?.message || e}`)
         memFallbackNotified = true
@@ -379,6 +380,7 @@ function applyMemoryStep(os) {
   if (!trace || !trace.steps?.length) return
   const step = trace.steps[m.refPtr % trace.steps.length].state
   m.refPtr++
+  m.traceCursor = (m.refPtr - 1) % trace.steps.length   // 揭示游标 → 当前步（MemoryCore「分步执行过程」据此逐步显示）
 
   const page = step.引用页
   const hit = step.命中
@@ -429,49 +431,6 @@ function applyMemoryStep(os) {
     绝对地址: absAddr,        // 命中 → 直接得址；缺页 → 装入后重试得址
   }
 
-function replayPagingTrace(os) {
-  const trace = os.memory.pagingTrace
-  const next = os.memory.traceCursor + 1
-  if (!trace?.steps?.length || next >= trace.steps.length) {
-    if (os.memory.backendMode === 'backend') {
-      os.memory.backendMode = 'local'
-      os.memory.backendError = '后端分页 trace 已播放完，当前继续使用 local mock'
-    }
-    accessPage(os)
-    return
-  }
-  os.applyPagingStep(next)
-}
-
-async function preparePagingTrace(os) {
-  if (os.memory.backendMode === 'backend' && os.memory.pagingTrace) return
-  if (pagingPreparePromise) return pagingPreparePromise
-
-  pagingPreparePromise = (async () => {
-    try {
-      const trace = await api.paging({
-        algorithm: os.config.pageAlgo,
-        reference_string: os.memory.refString,
-        frames: os.memory.frameCount || os.memory.capacity,
-      })
-      os.setPagingTrace(trace)
-    } catch (e) {
-      os.clearPagingTrace(e?.message || '后端分页引擎不可用')
-    } finally {
-      pagingPreparePromise = null
-    }
-  })()
-  return pagingPreparePromise
-}
-
-// ———————————————————————— 设备：磁盘驱动调度（移臂 + 旋转）————————————————————————
-function chooseDiskRequest(d, algo) {
-  const q = d.queue
-  if (algo === 'FCFS') return 0
-  if (algo === 'SSTF') {
-    let bi = 0, bd = Infinity
-    q.forEach((r, i) => { const dist = Math.abs(r.柱面号 - d.head); if (dist < bd) { bd = dist; bi = i } })
-    return bi
   // 仅缺页推事件（命中的实时绝对地址在「最近访存」面板呈现，避免刷屏）
   if (!hit) {
     const detail = evicted === null
@@ -771,11 +730,6 @@ function pvConsume(s, proc, os) {
   }
 }
 
-  // —— 存储：访存与缺页置换 ——
-  if (running && Math.random() < 0.7) {
-    if (os.memory.backendMode === 'backend') replayPagingTrace(os)
-    else accessPage(os)
-  }
 /** 一拍同步活动：由进程驱动(运行进程偏生产)，缓冲越满越偏消费 → 自平衡且偶发阻塞/唤醒。 */
 function stepSync(os, running) {
   const s = os.sync
@@ -857,16 +811,6 @@ export function useOsDriver() {
     os.running = true
     schedule()
   }
-  async function start() {
-    if (os.running) return
-    await preparePagingTrace(os)
-    os.running = true
-    schedule()
-  }
-  function pause() { os.running = false; if (timer) { clearInterval(timer); timer = null } }
-  async function step() {
-    if (os.memory.traceCursor < 0 && !os.memory.backendError) await preparePagingTrace(os)
-    tick(os)
   function pause() { os.running = false; if (timer) { clearInterval(timer); timer = null } }
   async function step() {
     if (ticking) return
