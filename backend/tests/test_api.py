@@ -22,6 +22,74 @@ def test_disk_run_scan():
     assert r.json()["metrics"]["总寻道道数"] == 331
 
 
+def test_disk_algorithms_list():
+    r = client.get("/api/disk/algorithms")
+    assert r.status_code == 200
+    algos = r.json()["algorithms"]
+    assert "FCFS" in algos
+    assert "SSTF" in algos
+    assert "SCAN" in algos
+    assert "F-SCAN" in algos
+    assert "N-SCAN" in algos
+
+
+def test_disk_simulate_basic():
+    r = client.post("/api/disk/simulate", json={
+        "algorithm": "SCAN",
+        "io_requests": [
+            {"进程名": "P1", "柱面号": 98, "磁道号": 2, "物理记录号": 3},
+            {"进程名": "P2", "柱面号": 183, "磁道号": 1, "物理记录号": 5},
+            {"进程名": "P3", "柱面号": 37, "磁道号": 3, "物理记录号": 2},
+        ],
+        "head": 53,
+        "current_record": 0,
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert data["module"] == "disk"
+    assert data["algorithm"] == "SCAN"
+    assert len(data["steps"]) == 3
+    assert data["metrics"]["总寻道道数"] > 0
+
+
+def test_disk_simulate_with_geometry():
+    r = client.post("/api/disk/simulate", json={
+        "algorithm": "SSTF",
+        "io_requests": [
+            {"进程名": "P1", "柱面号": 50, "磁道号": 0, "物理记录号": 3},
+        ],
+        "head": 10,
+        "current_record": 0,
+        "geometry": {
+            "cylinders": 200,
+            "tracks_per_cylinder": 4,
+            "records_per_track": 8,
+        },
+    })
+    assert r.status_code == 200
+    assert r.json()["metrics"]["总寻道道数"] == 40
+
+
+def test_disk_benchmark():
+    r = client.post("/api/disk/benchmark", json={
+        "io_requests": [
+            {"进程名": "P1", "柱面号": 98, "磁道号": 2, "物理记录号": 3},
+            {"进程名": "P2", "柱面号": 183, "磁道号": 1, "物理记录号": 5},
+            {"进程名": "P3", "柱面号": 37, "磁道号": 3, "物理记录号": 2},
+        ],
+        "head": 53,
+        "algorithms": ["FCFS", "SSTF", "SCAN", "LOOK"],
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert "FCFS" in data
+    assert "SSTF" in data
+    assert "SCAN" in data
+    assert "LOOK" in data
+    # SSTF 应该比 FCFS 更少寻道
+    assert data["SSTF"]["总寻道道数"] <= data["FCFS"]["总寻道道数"]
+
+
 def test_scheduling_run_fcfs():
     r = client.post("/api/scheduling/run", json={
         "algorithm": "FCFS",

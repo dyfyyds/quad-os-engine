@@ -8,7 +8,8 @@
 // —— 出厂默认配置（也是「重置模拟」的基线）——
 export const DEFAULT_CONFIG = {
   quantum: 2,
-  frameCount: 8,         // 内存（物理）块数
+  frameCount: 4,         // 内存（物理）块数（< 访问串去重页数，确保发生缺页置换/调出/写回）
+  blockSize: 128,        // 块长（页/物理块字节数）—— 地址转换：绝对地址 = 主存块号 × 块长 + 单元号
   resTotal: 10,
   cylinders: 200,        // 柱面总数（移臂调度的定位维度）
   tracksPerCyl: 4,       // 每柱面磁道数（磁头数）
@@ -167,8 +168,8 @@ export function seedState(cfg) {
       deadlock: false,
     },
 
-    // —— 进程同步（PV）——
-    sync: { capacity: 10, s1: 10, s2: 0, buffer: 0, produced: 0, consumed: 0, prodBlocked: [], consBlocked: [] },
+    // —— 进程同步（PV）—— 缓冲区取小值，让 P/V 阻塞与唤醒可见（s1 初值 = 容量）
+    sync: { capacity: 4, s1: 4, s2: 0, buffer: 0, produced: 0, consumed: 0, prodBlocked: [], consBlocked: [] },
 
     // —— 设备核心（磁盘驱动调度）——
     disk,

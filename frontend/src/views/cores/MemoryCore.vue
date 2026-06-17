@@ -6,6 +6,7 @@
         分页式虚拟存储 · 修改位/访问位/外存地址 · 缺页置换 —— 当前置换算法：{{ os.config.pageAlgo }}
         <el-tag :type="modeTagType" effect="plain" size="small" round>{{ modeLabel }}</el-tag>
       </p>
+      <p class="qos-page-sub">分页式虚拟存储 · 地址转换（页号×块长+单元号）· 缺页置换 —— 当前置换算法：{{ os.config.pageAlgo }}（置换引擎）</p>
     </div>
 
     <el-alert v-if="os.memory.backendError" class="mode-alert" type="warning" show-icon :closable="false">
@@ -30,15 +31,23 @@
       <el-progress :percentage="os.metrics.memUtil" :stroke-width="14" :text-inside="true" style="margin-top: 14px;" />
     </SectionCard>
 
-    <SectionCard title="最近一次访存 / 缺页置换" icon="Switch" style="margin-bottom: 14px;">
-      <el-descriptions :column="6" border size="small">
+    <SectionCard title="最近一次访存 · 地址转换 / 缺页置换" icon="Switch" style="margin-bottom: 14px;">
+      <el-descriptions :column="4" border size="small">
         <el-descriptions-item label="访问页号">
           <span class="big">{{ lr.访问页 === null ? '—' : '页 ' + lr.访问页 }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="访问单元号">
+          <span class="big">{{ lr.访问页 === null ? '—' : lr.单元号 }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="结果">
           <el-tag v-if="lr.访问页 === null" type="info" effect="plain" size="small">待运行</el-tag>
           <el-tag v-else-if="lr.缺页" type="danger" effect="dark" size="small">缺页中断</el-tag>
           <el-tag v-else type="success" effect="dark" size="small">命中</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="绝对地址（块号×块长+单元）">
+          <span v-if="lr.访问页 === null">—</span>
+          <span v-else-if="lr.缺页" class="big out">缺页中断 *{{ lr.访问页 }} → {{ lr.绝对地址 }}</span>
+          <span v-else class="big in">{{ lr.绝对地址 }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="调出页面">
           <span class="big out">{{ swapOutText }}</span>
