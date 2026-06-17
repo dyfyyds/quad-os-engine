@@ -126,6 +126,7 @@ function buildDisk(config) {
     busyUntil: 0,         // 磁盘忙到哪个虚拟时刻
     busyLog: [],          // 最近服务区间：{ start, end, serviceTime, processName }
     busyRate: 0,          // 最近窗口磁盘忙碌率
+    ioBlocked: [],        // I/O 阻塞进程名列表（进程发起 I/O 时加入，I/O 完成时移除）
   }
 }
 
@@ -137,12 +138,25 @@ export function seedState(cfg) {
   const memory = buildMemory(config)
   const disk = buildDisk(config)
 
+  // 初始所有进程同时到达（arrival=0）且全部「就绪」等待调度；
+  // 唯一例外：init 作为系统首进程已被调度，初始即「运行」，演示 CPU 已有人占用。
+  // 状态只在两种情形改变：① 进程发起 I/O → 阻塞；② I/O 完成 → 重新就绪。
+  // 「新建」态留给运行期动态产生的新作业（driver 的"作业到达"事件）。
   const processes = [
     { pid: 1, name: 'init', state: '运行', arrival: 0, burst: 12, ran: 0, priority: 1 },
     { pid: 2, name: 'shell', state: '新建', arrival: 1, burst: 6, ran: 0, priority: 2 },
     { pid: 3, name: 'editor', state: '新建', arrival: 2, burst: 9, ran: 0, priority: 4 },
     { pid: 4, name: 'logger', state: '新建', arrival: 3, burst: 5, ran: 0, priority: 2 },
     { pid: 5, name: 'daemon', state: '新建', arrival: 4, burst: 7, ran: 0, priority: 3 },
+    { pid: 2, name: 'shell', state: '就绪', arrival: 0, burst: 6, ran: 0, priority: 2 },
+    { pid: 3, name: 'editor', state: '就绪', arrival: 0, burst: 9, ran: 0, priority: 4 },
+    { pid: 4, name: 'logger', state: '就绪', arrival: 0, burst: 5, ran: 0, priority: 2 },
+    { pid: 5, name: 'daemon', state: '就绪', arrival: 0, burst: 7, ran: 0, priority: 3 },
+    { pid: 1, name: 'init', state: '运行', arrival: 0, burst: 12, ran: 3, priority: 1, blockedReason: '', pageWaitingFor: null, blockedAt: null },
+    { pid: 2, name: 'shell', state: '就绪', arrival: 1, burst: 6, ran: 0, priority: 2, blockedReason: '', pageWaitingFor: null, blockedAt: null },
+    { pid: 3, name: 'editor', state: '就绪', arrival: 2, burst: 9, ran: 0, priority: 4, blockedReason: '', pageWaitingFor: null, blockedAt: null },
+    { pid: 4, name: 'logger', state: '阻塞', arrival: 3, burst: 5, ran: 2, priority: 2, blockedReason: 'I/O 等待', pageWaitingFor: null, blockedAt: null },
+    { pid: 5, name: 'daemon', state: '就绪', arrival: 4, burst: 7, ran: 0, priority: 3, blockedReason: '', pageWaitingFor: null, blockedAt: null },
   ]
   const used = memory.frames.filter((x) => x !== null).length
   const memUtil = Math.round((used / memory.capacity) * 100)
@@ -155,6 +169,7 @@ export function seedState(cfg) {
     // —— 处理机核心 ——
     processes,
     gantt: [],
+    gantt: [],  // 由 driver 按"实际运行进程"逐拍累加；初始空，clock=0 时尚未发生 CPU 调度
     nextPid: 6,
 
     // —— 存储核心 ——
