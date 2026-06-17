@@ -48,6 +48,18 @@ export const useOsStore = defineStore('os', {
         if (h[k].length > cap) h[k].shift()
       }
     },
+    setPagingTrace(trace) {
+      this.memory.pagingTrace = trace
+      this.memory.traceCursor = -1
+      this.memory.backendMode = 'backend'
+      this.memory.backendError = ''
+    },
+    clearPagingTrace(message = '') {
+      this.memory.pagingTrace = null
+      this.memory.traceCursor = -1
+      this.memory.backendMode = 'local'
+      this.memory.backendError = message
+    },
     resetState() {
       this.$state = seedState()
     },

@@ -291,9 +291,11 @@ async function prepareMemoryTrace(os) {
       })
       memTraceKey = key
       memFallbackNotified = false
+      os.setPagingTrace(memTrace)   // 同步至 store：backend 模式 + 暴露 trace.steps 给「分步执行过程」
     } catch (e) {
       memTrace = localPagingTrace(os)
       memTraceKey = key
+      os.clearPagingTrace(e?.message || '后端分页接口不可用')   // 同步至 store：local 回退模式 + 告警
       if (!memFallbackNotified) {
         os.pushEvent('分页回退', 'memory', 'warning', `后端分页接口不可用，临时使用前端等价算法：${e?.message || e}`)
         memFallbackNotified = true
@@ -378,6 +380,7 @@ function applyMemoryStep(os) {
   if (!trace || !trace.steps?.length) return
   const step = trace.steps[m.refPtr % trace.steps.length].state
   m.refPtr++
+  m.traceCursor = (m.refPtr - 1) % trace.steps.length   // 揭示游标 → 当前步（MemoryCore「分步执行过程」据此逐步显示）
 
   const page = step.引用页
   const hit = step.命中

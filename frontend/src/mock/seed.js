@@ -88,6 +88,10 @@ function buildMemory(config) {
     refPtr: 0,
     faults: 0,
     hits: 0,
+    pagingTrace: null,
+    traceCursor: -1,
+    backendMode: 'local',
+    backendError: '',
     clockPtr: 0,               // CLOCK 置换算法的时钟指针
     // 最近一次访存 / 缺页置换（界面据此指明「调出页面」与「装入页号」）
     lastReplace: { 访问页: null, 缺页: false, 调出页: null, 装入页: null, 装入块: null, 写回: false },
