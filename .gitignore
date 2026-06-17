@@ -51,3 +51,6 @@ mysql/data/
 # ==================== OS ====================
 .DS_Store
 Desktop.ini
+
+# ==================== Screenshots ====================
+screenshots/
