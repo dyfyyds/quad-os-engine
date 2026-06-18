@@ -989,8 +989,8 @@ async function tick(os) {
   os.clock++
   const t = os.clock
 
-  // —— 新作业到达：固定节拍与固定参数，保证重置后可复现 ——
-  if (t % 7 === 0) addDeterministicArrival(os, t)
+  // —— 新作业到达：默认关闭，避免自定义进程实验被运行时新作业干扰 ——
+  if (os.config.processAutoArrival && t % 7 === 0) addDeterministicArrival(os, t)
 
   // —— 处理机/存储：以后端 trace 为准逐周期回放 ——
   await prepareCpuTrace(os)

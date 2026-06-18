@@ -1,5 +1,28 @@
 export const EXPERIMENTS = [
   {
+    id: 'processor',
+    title: '处理机调度实验',
+    icon: 'Cpu',
+    color: '#16a085',
+    target: '观察 RR 时间片轮转下运行进程、就绪/阻塞队列、甘特图和 PCB 状态变化。',
+    inputs: '调度算法 RR；时间片 2；可编辑进程名、到达时间、服务时间、优先级。',
+    expected: '单步或运行后，当前运行进程、甘特图片段、PCB 进度和队列状态应持续联动变化。',
+    view: '处理机调度：查看运行进程、就绪/阻塞队列、CPU 甘特图和 PCB 表。',
+    route: '/core/processor',
+    config: {
+      schedAlgo: 'RR',
+      quantum: 2,
+      processAutoArrival: false,
+      processes: [
+        { pid: 1, name: 'init', arrival: 0, burst: 12, priority: 1 },
+        { pid: 2, name: 'shell', arrival: 0, burst: 6, priority: 2 },
+        { pid: 3, name: 'editor', arrival: 0, burst: 9, priority: 4 },
+        { pid: 4, name: 'logger', arrival: 0, burst: 5, priority: 2 },
+        { pid: 5, name: 'daemon', arrival: 0, burst: 7, priority: 3 },
+      ],
+    },
+  },
+  {
     id: 'paging',
     title: '页面置换实验',
     icon: 'Coin',
