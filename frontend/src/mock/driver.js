@@ -933,7 +933,7 @@ function syncProduce(os, running) {
  */
 function syncConsume(os) {
   const s = os.sync
-  const producer = (running && running.name) || os.processes[clampIndex(os.clock, os.processes.length)]?.name || 'proc'
+  const producer = os.runningProc?.name || os.processes[clampIndex(os.clock, os.processes.length)]?.name || 'proc'
   const consumer = os.processes[clampIndex(os.clock + 1, os.processes.length)]?.name || 'proc'
   const fillRatio = s.buffer / Math.max(1, s.capacity)
   const shouldProduce = s.buffer === 0 || (s.buffer < s.capacity && (os.clock + Math.round(fillRatio * 10)) % 2 === 0)
@@ -961,11 +961,7 @@ function addDeterministicArrival(os, t) {
     blockedAt: null,
   })
   os.pushEvent('作业到达', 'processor', 'info', `新作业 ${name} 进入就绪队列`)
-  // 队列上限保护：超出 12 时砍掉最早一个非运行进程，避免 PCB 表无限增长
-  if (os.processes.length > 12) {
-    const idx = os.processes.findIndex((p) => p.state !== '运行')
-    if (idx >= 0) os.processes.splice(idx, 1)
-  }
+  // PCB 是运行历史的一部分，不删除早期进程；表格自身滚动承载长列表。
   // 清除 CPU trace 缓存，下一 tick 重算包含新作业的甘特
   cpuTrace = null
   cpuTraceKey = ''
@@ -1011,7 +1007,6 @@ async function tick(os) {
       last.结束 = t
     } else {
       os.gantt.push({ 作业: running.name, 开始: t - 1, 结束: t })
-      if (os.gantt.length > 40) os.gantt.shift()
     }
     if (running.ran >= running.burst) {
       running.finishTime = t

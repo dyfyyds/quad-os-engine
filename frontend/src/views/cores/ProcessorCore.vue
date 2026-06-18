@@ -5,6 +5,9 @@
       <p class="qos-page-sub">进程控制块(PCB) · 状态生命周期 · 与磁盘 I/O 联动 —— 当前调度算法：{{ os.config.schedAlgo }}（调度引擎）</p>
     </div>
 
+    <el-alert class="observe-tip" type="info" show-icon :closable="false"
+      title="观察顺序：运行进程 → 就绪/阻塞队列 → 甘特图 → PCB 进度" />
+
     <el-row :gutter="14" style="margin-bottom: 14px;">
       <el-col :span="6"><StatCard label="运行进程" :value="os.runningProc ? os.runningProc.name : '空闲'" icon="VideoPlay" color="#15a98a" /></el-col>
       <el-col :span="6"><StatCard label="就绪队列" :value="os.metrics.readyLen" icon="List" color="#3b82f6" /></el-col>
@@ -179,6 +182,7 @@ const ganttReveal = computed(() => {
 </script>
 
 <style scoped>
+.observe-tip { margin-bottom: 14px; }
 .queue { display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px; align-items: center; }
 .queue .empty { color: #b3bccd; font-size: 12px; }
 

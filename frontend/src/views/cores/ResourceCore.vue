@@ -5,6 +5,9 @@
       <p class="qos-page-sub">银行家算法死锁避免 · PV 信号量同步（银行家·同步引擎，进程驱动）</p>
     </div>
 
+    <el-alert class="observe-tip" type="info" show-icon :closable="false"
+      title="观察顺序：Available → Need → 安全序列 → 死锁/告警" />
+
     <el-alert v-if="os.resources.deadlock" type="error" :closable="false" show-icon style="margin-bottom: 14px;"
       title="死锁告警：系统检测到循环等待，处于不安全状态" />
 
@@ -54,3 +57,7 @@ const syncState = computed(() => ({
   消费者阻塞队列: os.sync.consBlocked,
 }))
 </script>
+
+<style scoped>
+.observe-tip { margin-bottom: 14px; }
+</style>
