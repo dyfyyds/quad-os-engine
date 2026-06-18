@@ -69,21 +69,16 @@
       <StepLog :steps="traceSteps" :reveal="os.memory.traceCursor" />
     </SectionCard>
 
-    <SectionCard icon="List" style="margin-bottom: 14px;">
-      <template #title>
-        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span>页表（页号 · 标志 · 主存块号 · 访问位 · 修改位 · 外存地址）</span>
-            <span style="font-size: 12px; color: #9aa4b6; font-weight: normal; margin-left: 12px;" v-if="selectedProcStats">
-              累计访存: {{ selectedProcStats.total }} 次 | 缺页: {{ selectedProcStats.faults }} 次 | 缺页率: {{ selectedProcStats.rate }}%
-            </span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 12px; font-weight: normal; font-size: 13px;" @click.stop>
-            <el-checkbox v-model="autoTrack" size="small">自动跟踪运行进程</el-checkbox>
-            <el-select v-model="selectedPid" size="small" style="width: 120px;" :disabled="autoTrack">
-              <el-option v-for="p in os.processes" :key="p.pid" :label="p.name" :value="p.pid" />
-            </el-select>
-          </div>
+    <SectionCard title="页表（页号 · 标志 · 主存块号 · 访问位 · 修改位 · 外存地址）" icon="List" style="margin-bottom: 14px;">
+      <template #extra>
+        <div style="display: flex; align-items: center; gap: 12px; font-weight: normal; font-size: 13px;" @click.stop>
+          <span style="font-size: 12px; color: #9aa4b6; margin-right: 8px;" v-if="selectedProcStats">
+            累计访存: {{ selectedProcStats.total }} 次 | 缺页: {{ selectedProcStats.faults }} 次 | 缺页率: {{ selectedProcStats.rate }}%
+          </span>
+          <el-checkbox v-model="autoTrack" size="small">自动跟踪运行进程</el-checkbox>
+          <el-select v-model="selectedPid" size="small" style="width: 120px;" :disabled="autoTrack">
+            <el-option v-for="p in os.processes" :key="p.pid" :label="p.name" :value="p.pid" />
+          </el-select>
         </div>
       </template>
       <el-table :data="displayedPageTable" size="small" max-height="320" :row-class-name="rowClass">
