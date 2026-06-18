@@ -18,7 +18,15 @@ export const DEFAULT_CONFIG = {
   pageAlgo: 'LRU',
   diskAlgo: 'SCAN',
   clockSpeed: 1,
+  processAutoArrival: false,
   // —— 可编辑的实验数据 ——
+  processes: [                                       // 处理机调度实验进程表
+    { pid: 1, name: 'init', arrival: 0, burst: 12, priority: 1 },
+    { pid: 2, name: 'shell', arrival: 0, burst: 6, priority: 2 },
+    { pid: 3, name: 'editor', arrival: 0, burst: 9, priority: 4 },
+    { pid: 4, name: 'logger', arrival: 0, burst: 5, priority: 2 },
+    { pid: 5, name: 'daemon', arrival: 0, burst: 7, priority: 3 },
+  ],
   refStringText: '7,0,1,2,0,3,0,4,2,3,0,3,2,1,2',  // 页面访问串（逗号分隔）
   ioRequests: [                                     // I/O 请求队列（驱动调度）
     { 进程名: '进程1', 柱面号: 98, 磁道号: 2, 物理记录号: 3 },
@@ -130,25 +138,50 @@ function buildDisk(config) {
   }
 }
 
+function buildProcesses(config) {
+  const source = (config.processes && config.processes.length ? config.processes : DEFAULT_CONFIG.processes)
+    .map((p, i) => ({
+      pid: Number(p.pid) || i + 1,
+      name: String(p.name || `P${i + 1}`).trim() || `P${i + 1}`,
+      arrival: Math.max(0, Number(p.arrival) || 0),
+      burst: Math.max(1, Number(p.burst) || 1),
+      priority: Math.max(1, Number(p.priority) || 1),
+    }))
+
+  let started = false
+  return source.map((p) => {
+    let state = '新建'
+    if (p.arrival <= 0) {
+      state = started ? '就绪' : '运行'
+      started = true
+    }
+    return {
+      ...p,
+      state,
+      ran: 0,
+      blockedReason: '',
+      pageWaitingFor: null,
+      blockedAt: null,
+    }
+  })
+}
+
 export function seedState(cfg) {
   const config = { ...DEFAULT_CONFIG, ...(cfg || {}) }
   // 深拷贝可编辑数据，避免与已 seed 的运行态共享引用
   config.ioRequests = (config.ioRequests || DEFAULT_CONFIG.ioRequests).map((r) => ({ ...r }))
+  config.processes = (config.processes || DEFAULT_CONFIG.processes).map((p, i) => ({
+    pid: Number(p.pid) || i + 1,
+    name: String(p.name || `P${i + 1}`).trim() || `P${i + 1}`,
+    arrival: Math.max(0, Number(p.arrival) || 0),
+    burst: Math.max(1, Number(p.burst) || 1),
+    priority: Math.max(1, Number(p.priority) || 1),
+  }))
 
   const memory = buildMemory(config)
   const disk = buildDisk(config)
-
-  // 初始所有进程同时到达（arrival=0）且全部「就绪」等待调度；
-  // 唯一例外：init 作为系统首进程已被调度，初始即「运行」，演示 CPU 已有人占用。
-  // 状态只在两种情形改变：① 进程发起 I/O → 阻塞；② I/O 完成 → 重新就绪。
-  // 「新建」态留给运行期动态产生的新作业（driver 的"作业到达"事件）。
-  const processes = [
-    { pid: 1, name: 'init',   state: '运行', arrival: 0, burst: 12, ran: 0, priority: 1, blockedReason: '', pageWaitingFor: null, blockedAt: null },
-    { pid: 2, name: 'shell',  state: '就绪', arrival: 0, burst: 6,  ran: 0, priority: 2, blockedReason: '', pageWaitingFor: null, blockedAt: null },
-    { pid: 3, name: 'editor', state: '就绪', arrival: 0, burst: 9,  ran: 0, priority: 4, blockedReason: '', pageWaitingFor: null, blockedAt: null },
-    { pid: 4, name: 'logger', state: '就绪', arrival: 0, burst: 5,  ran: 0, priority: 2, blockedReason: '', pageWaitingFor: null, blockedAt: null },
-    { pid: 5, name: 'daemon', state: '就绪', arrival: 0, burst: 7,  ran: 0, priority: 3, blockedReason: '', pageWaitingFor: null, blockedAt: null },
-  ]
+  const processes = buildProcesses(config)
+  const maxPid = processes.reduce((max, p) => Math.max(max, p.pid), 0)
   const used = memory.frames.filter((x) => x !== null).length
   const memUtil = Math.round((used / memory.capacity) * 100)
 
@@ -160,7 +193,7 @@ export function seedState(cfg) {
     // —— 处理机核心 ——
     processes,
     gantt: [],  // 由 driver 按"实际运行进程"逐拍累加；初始空，clock=0 时尚未发生 CPU 调度
-    nextPid: 6,
+    nextPid: maxPid + 1,
 
     // —— 存储核心 ——
     memory,

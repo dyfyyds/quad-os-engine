@@ -11,6 +11,8 @@
     <el-alert v-if="os.memory.backendError" class="mode-alert" type="warning" show-icon :closable="false">
       <template #title>后端未连接，当前使用 local mock：{{ os.memory.backendError }}</template>
     </el-alert>
+    <el-alert class="observe-tip" type="info" show-icon :closable="false"
+      title="观察顺序：访问页号 → 是否缺页 → 页框变化 → 页表状态 → 事件日志" />
 
     <el-row :gutter="14" style="margin-bottom: 14px;">
       <el-col :span="6"><StatCard label="缺页次数" :value="os.memory.faults" icon="Warning" color="#e64a45" /></el-col>
@@ -88,6 +90,8 @@
 
     <SectionCard title="分页地址转换" icon="Operation">
       <el-alert v-if="translateError" class="translate-alert" type="error" show-icon :closable="false" :title="translateError" />
+      <el-alert class="formula-tip" type="info" show-icon :closable="false"
+        title="公式：绝对地址 = 主存块号 × 块长 + 单元号。结果依赖当前页表；标志位为 0 时产生缺页中断。" />
       <el-form label-position="top" class="translate-form">
         <el-row :gutter="14">
           <el-col :xs="24" :sm="6">
@@ -196,6 +200,7 @@ async function runTranslate() {
 
 <style scoped>
 .mode-alert { margin-bottom: 14px; }
+.observe-tip { margin-bottom: 14px; }
 .frames { display: flex; flex-wrap: wrap; gap: 10px; }
 .frame { width: 90px; border: 1.5px dashed #c7d0e0; border-radius: 8px; padding: 10px; text-align: center; transition: all .25s; }
 .frame.filled { border-style: solid; border-color: var(--qos-accent); background: var(--qos-accent-soft); }
@@ -212,6 +217,7 @@ async function runTranslate() {
 .bit.warn { color: #f0a020; font-weight: 700; }
 .addr { font-family: 'Consolas', 'Menlo', monospace; color: #6b77a0; }
 .translate-alert { margin-bottom: 12px; }
+.formula-tip { margin-bottom: 12px; }
 .translate-form { margin-bottom: 4px; }
 .translate-action { display: flex; align-items: center; padding-top: 30px; }
 .translate-action .el-button { width: 100%; }

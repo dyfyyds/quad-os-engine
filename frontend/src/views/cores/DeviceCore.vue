@@ -5,6 +5,9 @@
       <p class="qos-page-sub">移臂调度（按柱面号） + 旋转调度（按物理记录号） · 真实盘面几何 —— 当前算法：{{ os.config.diskAlgo }}（驱动调度引擎）</p>
     </div>
 
+    <el-alert class="observe-tip" type="info" show-icon :closable="false"
+      title="观察顺序：请求队列 → 磁头位置 → 移臂轨迹 → 最近服务记录" />
+
     <el-row :gutter="14" style="margin-bottom: 14px;">
       <el-col :span="6"><StatCard label="磁头柱面" :value="os.disk.head" unit="柱" icon="Position" color="#8b5cf6" /></el-col>
       <el-col :span="6"><StatCard label="累计移臂" :value="os.disk.totalSeek" unit="柱" icon="Odometer" color="#15a98a" /></el-col>
@@ -74,6 +77,7 @@ const os = useOsStore()
 </script>
 
 <style scoped>
+.observe-tip { margin-bottom: 14px; }
 .snap { list-style: none; margin: 0; padding: 0; }
 .snap li { display: flex; justify-content: space-between; align-items: center; padding: 9px 2px; border-bottom: 1px solid #f1f4f8; font-size: 13px; }
 .snap li:last-child { border-bottom: none; }
