@@ -21,8 +21,8 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(row, i) in max" :key="i" :class="{ done: completed.includes('P' + i) }">
-            <td :style="current === 'P' + i ? 'background:#eef3ff;font-weight:600' : ''">P{{ i }}</td>
+          <tr v-for="(row, i) in max" :key="i" :class="{ done: completed.includes(getProcName(i)) }">
+            <td :style="current === getProcName(i) ? 'background:#eef3ff;font-weight:600' : ''">{{ getProcName(i) }}</td>
             <td v-for="(v, j) in row" :key="'m' + j">{{ v }}</td>
             <td v-for="(v, j) in alloc[i]" :key="'a' + j">{{ v }}</td>
             <td v-for="(v, j) in need[i]" :key="'n' + j">{{ v }}</td>
@@ -44,12 +44,19 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useOsStore } from '../../store/os'
 
 const props = defineProps({
   final: { type: Object, default: () => ({}) },
   steps: { type: Array, default: () => [] },
   reveal: { type: Number, default: -1 },
 })
+
+const os = useOsStore()
+
+const getProcName = (i) => {
+  return os.processes[i]?.name || `P${i}`
+}
 
 const max = computed(() => props.final.Max || [])
 const alloc = computed(() => props.final.Allocation || [])

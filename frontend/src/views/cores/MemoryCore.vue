@@ -69,8 +69,24 @@
       <StepLog :steps="traceSteps" :reveal="os.memory.traceCursor" />
     </SectionCard>
 
-    <SectionCard title="页表（页号 · 标志 · 主存块号 · 访问位 · 修改位 · 外存地址）" icon="List" style="margin-bottom: 14px;">
-      <el-table :data="os.memory.pageTable" size="small" max-height="320" :row-class-name="rowClass">
+    <SectionCard icon="List" style="margin-bottom: 14px;">
+      <template #title>
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>页表（页号 · 标志 · 主存块号 · 访问位 · 修改位 · 外存地址）</span>
+            <span style="font-size: 12px; color: #9aa4b6; font-weight: normal; margin-left: 12px;" v-if="selectedProcStats">
+              累计访存: {{ selectedProcStats.total }} 次 | 缺页: {{ selectedProcStats.faults }} 次 | 缺页率: {{ selectedProcStats.rate }}%
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; font-weight: normal; font-size: 13px;" @click.stop>
+            <el-checkbox v-model="autoTrack" size="small">自动跟踪运行进程</el-checkbox>
+            <el-select v-model="selectedPid" size="small" style="width: 120px;" :disabled="autoTrack">
+              <el-option v-for="p in os.processes" :key="p.pid" :label="p.name" :value="p.pid" />
+            </el-select>
+          </div>
+        </div>
+      </template>
+      <el-table :data="displayedPageTable" size="small" max-height="320" :row-class-name="rowClass">
         <el-table-column prop="页号" label="页号" width="70" />
         <el-table-column label="标志（状态位）" width="120"><template #default="{ row }">
           <el-tag :type="row.标志 === 1 ? 'success' : 'info'" effect="plain" size="small">{{ row.标志 === 1 ? '1 · 在主存' : '0 · 在外存' }}</el-tag>
@@ -137,7 +153,37 @@ import SectionCard from '../../components/widgets/SectionCard.vue'
 import StepLog from '../../components/StepLog.vue'
 
 const os = useOsStore()
-const lr = computed(() => os.memory.lastReplace)
+const autoTrack = ref(true)
+const selectedPid = ref(1)
+
+watch(() => os.runningProc, (newProc) => {
+  if (autoTrack.value && newProc) {
+    selectedPid.value = newProc.pid
+  }
+}, { immediate: true })
+
+const displayedPageTable = computed(() => {
+  const proc = os.processes.find(p => p.pid === selectedPid.value)
+  return proc ? proc.pageTable : os.memory.pageTable
+})
+
+const selectedProcStats = computed(() => {
+  const proc = os.processes.find(p => p.pid === selectedPid.value)
+  if (!proc) return null
+  const total = proc.hits + proc.faults
+  const rate = total ? Math.round((proc.faults / total) * 100) : 0
+  return {
+    hits: proc.hits,
+    faults: proc.faults,
+    total,
+    rate
+  }
+})
+
+const lr = computed(() => {
+  const proc = os.processes.find(p => p.pid === selectedPid.value)
+  return proc ? proc.lastReplace : os.memory.lastReplace
+})
 const traceSteps = computed(() => os.memory.pagingTrace?.steps || [])
 const modeLabel = computed(() => (os.memory.backendMode === 'backend' ? 'backend engine' : 'local mock'))
 const modeTagType = computed(() => (os.memory.backendMode === 'backend' ? 'success' : 'warning'))
@@ -153,12 +199,16 @@ watch(() => os.config.blockSize, (v) => { if (v) translateForm.blockSize = v })
 
 const swapOutText = computed(() => {
   const r = lr.value
-  if (!r.缺页) return '—'
+  if (!r || !r.缺页) return '—'
   return r.调出页 === null ? '无（装入空闲块）' : '页 ' + r.调出页
 })
 
-// 命中/装入的页所在行高亮
-const rowClass = ({ row }) => (lr.value.装入页 === row.页号 && lr.value.装入块 !== null ? 'row-active' : '')
+// 命中/装入的页所在行高亮 (命中为浅绿，缺页为浅红)
+const rowClass = ({ row }) => {
+  const r = lr.value
+  if (!r || r.访问页 !== row.页号) return ''
+  return r.缺页 ? 'row-fault' : 'row-hit'
+}
 
 function parseInstructions(text) {
   return String(text || '')
@@ -222,5 +272,6 @@ async function runTranslate() {
 .translate-action { display: flex; align-items: center; padding-top: 30px; }
 .translate-action .el-button { width: 100%; }
 
-:deep(.row-active) { background: var(--qos-accent-soft) !important; }
+:deep(.row-hit) { background: rgba(21, 169, 138, 0.08) !important; }
+:deep(.row-fault) { background: rgba(230, 74, 69, 0.08) !important; }
 </style>
