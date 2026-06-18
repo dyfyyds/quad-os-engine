@@ -276,6 +276,22 @@ function applyCpuTrace(os) {
             refreshBankerSafety(os, false)
           }
         }
+
+        // 释放其持有的所有物理内存块，更新页表
+        os.memory.frames = os.memory.frames.map((framePage, slot) => {
+          if (framePage !== null) {
+            const pageIndex = p.pageTable.findIndex(row => row.标志 === 1 && row.主存块号 === slot)
+            if (pageIndex >= 0) {
+              p.pageTable[pageIndex].标志 = 0
+              p.pageTable[pageIndex].主存块号 = null
+              p.pageTable[pageIndex].访问位 = 0
+              p.pageTable[pageIndex].修改位 = 0
+              return null
+            }
+          }
+          return framePage
+        })
+        os.pushEvent('内存释放', 'memory', 'info', `${p.name} 完成，释放其占用的物理内存页框`)
       }
     } else if (time < p.arrival) {
       p.state = '新建'
@@ -574,8 +590,22 @@ function applyMemoryStep(os) {
         磁道号: 0,
         物理记录号: 0,
         isPageFault: true,
-        page: page
+        page: page,
+        unit: unit
       })
+
+      // 发生缺页时，立即更新进程和存储核心的最近一次访存状态
+      runningProc.lastReplace = {
+        访问页: page,
+        单元号: unit,
+        缺页: true,
+        调出页: null,
+        装入页: null,
+        装入块: null,
+        写回: false,
+        绝对地址: null
+      }
+      os.memory.lastReplace = { ...runningProc.lastReplace }
 
       os.pushEvent('缺页中断', 'memory', 'warning',
         `访问 [页 ${page} 单元 ${unit}] 缺页 —— 向磁盘队列发送读入请求，${runningProc.name} 进入阻塞`)
@@ -589,6 +619,7 @@ function loadPageAfterDiskIo(os, req) {
   if (!p) return
 
   const page = req.page
+  const unit = req.unit !== undefined ? req.unit : ((page * 31 + os.clock * 17) % (os.config.blockSize || 128))
   const algo = os.config.pageAlgo || 'LRU'
   const frameCount = os.memory.frameCount
 
@@ -679,13 +710,13 @@ function loadPageAfterDiskIo(os, req) {
   p.faults++
   p.lastReplace = {
     访问页: page,
-    单元号: (page * 31 + os.clock * 17) % (os.config.blockSize || 128),
+    单元号: unit,
     缺页: true,
     调出页: evicted,
     装入页: page,
     装入块: slot,
     写回: wroteBack,
-    绝对地址: slot * (os.config.blockSize || 128) + ((page * 31 + os.clock * 17) % (os.config.blockSize || 128))
+    绝对地址: slot * (os.config.blockSize || 128) + unit
   }
 
   os.memory.pageTable = p.pageTable.map(row => ({ ...row }))

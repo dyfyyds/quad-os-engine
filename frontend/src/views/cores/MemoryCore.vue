@@ -27,6 +27,7 @@
           :class="{ filled: f !== null, hot: lr.装入块 === i }">
           <div class="fno">块 {{ i }}</div>
           <div class="fpage">{{ f === null ? '空闲' : '页 ' + f }}</div>
+          <div v-if="f !== null" class="fowner">{{ getFrameOwnerName(i) }}</div>
         </div>
       </div>
       <el-progress :percentage="os.metrics.memUtil" :stroke-width="14" :text-inside="true" style="margin-top: 14px;" />
@@ -65,9 +66,6 @@
       </el-descriptions>
     </SectionCard>
 
-    <SectionCard title="分步执行过程" icon="Tickets" style="margin-bottom: 14px;">
-      <StepLog :steps="traceSteps" :reveal="os.memory.traceCursor" />
-    </SectionCard>
 
     <SectionCard title="页表（页号 · 标志 · 主存块号 · 访问位 · 修改位 · 外存地址）" icon="List" style="margin-bottom: 14px;">
       <template #extra>
@@ -99,53 +97,15 @@
       </el-table>
     </SectionCard>
 
-    <SectionCard title="分页地址转换" icon="Operation">
-      <el-alert v-if="translateError" class="translate-alert" type="error" show-icon :closable="false" :title="translateError" />
-      <el-alert class="formula-tip" type="info" show-icon :closable="false"
-        title="公式：绝对地址 = 主存块号 × 块长 + 单元号。结果依赖当前页表；标志位为 0 时产生缺页中断。" />
-      <el-form label-position="top" class="translate-form">
-        <el-row :gutter="14">
-          <el-col :xs="24" :sm="6">
-            <el-form-item label="块长">
-              <el-input-number v-model="translateForm.blockSize" :min="1" :max="4096" style="width: 100%;" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="14">
-            <el-form-item label="指令文本">
-              <el-input v-model="translateForm.instructionText" type="textarea" :rows="3" placeholder="每行一条，如：+,0,70" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="4" class="translate-action">
-            <el-button type="primary" :loading="translateLoading" @click="runTranslate">
-              <el-icon><Promotion /></el-icon>
-              转换
-            </el-button>
-          </el-col>
-        </el-row>
-      </el-form>
-      <el-table v-if="translateResults.length" :data="translateResults" size="small">
-        <el-table-column prop="页号" label="页号" width="80" />
-        <el-table-column prop="单元号" label="单元号" width="100" />
-        <el-table-column label="主存块号" width="100"><template #default="{ row }">{{ row.主存块号 === null ? '—' : row.主存块号 }}</template></el-table-column>
-        <el-table-column label="绝对地址" width="120"><template #default="{ row }">{{ row.绝对地址 === null ? '—' : row.绝对地址 }}</template></el-table-column>
-        <el-table-column label="缺页状态"><template #default="{ row }">
-          <el-tag :type="row.缺页 ? 'danger' : 'success'" effect="plain" size="small">
-            {{ row.缺页 ? '缺页中断 *' + row.页号 : '命中' }}
-          </el-tag>
-        </template></el-table-column>
-      </el-table>
-      <el-empty v-else description="输入指令并点击转换" :image-size="60" />
-    </SectionCard>
+
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useOsStore } from '../../store/os'
-import { api } from '../../api/client'
 import StatCard from '../../components/widgets/StatCard.vue'
 import SectionCard from '../../components/widgets/SectionCard.vue'
-import StepLog from '../../components/StepLog.vue'
 
 const os = useOsStore()
 const autoTrack = ref(true)
@@ -179,18 +139,8 @@ const lr = computed(() => {
   const proc = os.processes.find(p => p.pid === selectedPid.value)
   return proc ? proc.lastReplace : os.memory.lastReplace
 })
-const traceSteps = computed(() => os.memory.pagingTrace?.steps || [])
 const modeLabel = computed(() => (os.memory.backendMode === 'backend' ? 'backend engine' : 'local mock'))
 const modeTagType = computed(() => (os.memory.backendMode === 'backend' ? 'success' : 'warning'))
-const translateLoading = ref(false)
-const translateError = ref('')
-const translateResults = ref([])
-// 地址转换表单的"块长"初始与系统配置保持一致；用户在系统设置修改块长后自动同步
-const translateForm = reactive({
-  blockSize: os.config.blockSize || 128,
-  instructionText: '+,0,70\n存,3,21\n取,6,40',
-})
-watch(() => os.config.blockSize, (v) => { if (v) translateForm.blockSize = v })
 
 const swapOutText = computed(() => {
   const r = lr.value
@@ -205,41 +155,16 @@ const rowClass = ({ row }) => {
   return r.缺页 ? 'row-fault' : 'row-hit'
 }
 
-function parseInstructions(text) {
-  return String(text || '')
-    .split(/[\n;；]+/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const parts = line.split(/[,，\s]+/).filter(Boolean)
-      if (parts.length !== 3) throw new Error(`指令格式错误：${line}`)
-      const page = Number(parts[1])
-      const unit = Number(parts[2])
-      if (!Number.isInteger(page) || page < 0 || !Number.isInteger(unit) || unit < 0) {
-        throw new Error(`页号和单元号必须是非负整数：${line}`)
+function getFrameOwnerName(slot) {
+  for (const p of os.processes) {
+    if (p.pageTable) {
+      const pageIndex = p.pageTable.findIndex(row => row.标志 === 1 && row.主存块号 === slot)
+      if (pageIndex >= 0) {
+        return p.name
       }
-      return { 操作: parts[0], 页号: page, 单元号: unit }
-    })
-}
-
-async function runTranslate() {
-  translateError.value = ''
-  translateLoading.value = true
-  try {
-    const instructions = parseInstructions(translateForm.instructionText)
-    if (!instructions.length) throw new Error('请输入至少一条地址转换指令')
-    const trace = await api.pagingTranslate({
-      page_table: os.memory.pageTable,
-      instructions,
-      block_size: translateForm.blockSize,
-    })
-    translateResults.value = trace.final_state?.['转换结果'] || []
-  } catch (e) {
-    translateResults.value = []
-    translateError.value = e?.message || '地址转换失败'
-  } finally {
-    translateLoading.value = false
+    }
   }
+  return '—'
 }
 </script>
 
@@ -252,6 +177,7 @@ async function runTranslate() {
 .frame.hot { border-color: #f0a020; box-shadow: 0 0 0 3px rgba(240, 160, 32, .18); }
 .frame .fno { font-size: 11px; color: var(--qos-muted); }
 .frame .fpage { font-size: 15px; font-weight: 600; color: var(--qos-text); margin-top: 4px; }
+.frame .fowner { font-size: 11px; color: var(--qos-accent); margin-top: 4px; font-weight: 500; }
 
 .big { font-size: 14px; font-weight: 700; color: var(--qos-text); }
 .big.out { color: #e64a45; }

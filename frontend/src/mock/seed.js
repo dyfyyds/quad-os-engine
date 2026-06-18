@@ -204,6 +204,12 @@ export function seedState(cfg) {
   const used = memory.frames.filter((x) => x !== null).length
   const memUtil = Math.round((used / memory.capacity) * 100)
 
+  // 同步初始运行进程的页表以匹配暖机状态的物理内存页框
+  const initRunning = processes.find(p => p.state === '运行')
+  if (initRunning) {
+    initRunning.pageTable = memory.pageTable.map(row => ({ ...row }))
+  }
+
   // 动态构建资源池矩阵，长度与 processes 一致
   const numProcs = processes.length
   const maxMatrix = []
