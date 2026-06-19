@@ -9,6 +9,9 @@
         <el-menu-item index="/">
           <el-icon><DataBoard /></el-icon><template #title>总览大屏</template>
         </el-menu-item>
+        <el-menu-item index="/twin">
+          <el-icon><Connection /></el-icon><template #title>数字孪生</template>
+        </el-menu-item>
         <el-sub-menu index="core">
           <template #title><el-icon><Grid /></el-icon><span>核心管理</span></template>
           <el-menu-item index="/core/processor"><el-icon><Cpu /></el-icon>处理机调度</el-menu-item>
@@ -55,10 +58,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import RunControlBar from './components/widgets/RunControlBar.vue'
+import { useOsDriver } from './mock/driver'
 
 const collapsed = ref(false)
+const driver = useOsDriver()
+
+onMounted(async () => {
+  await driver.checkBackend()
+})
 </script>
 
 <style scoped>

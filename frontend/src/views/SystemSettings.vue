@@ -383,19 +383,21 @@ function loadExperiment(exp) {
   ElMessage.success('已加载：' + exp.title + '，可直接开始实验或继续调整关键输入')
 }
 
-function save() {
+async function save() {
   driver.pause()
   os.applyConfig()
+  await driver.checkBackend()
   ElMessage.success('配置已应用，模拟已按当前参数重建')
 }
-function startExperiment() {
+async function startExperiment() {
   driver.pause()
   os.applyConfig()
+  await driver.checkBackend()
   ElMessage.success('已开始：' + currentExperiment.value.title + '，请使用顶部“单步/运行”观察过程')
   router.push(currentExperiment.value.route)
 }
-function reset() {
-  driver.reset()
+async function reset() {
+  await driver.reset()
   activeExperimentId.value = 'paging'
   ElMessage.success('已恢复默认并重置模拟')
 }

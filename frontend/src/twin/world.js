@@ -19,6 +19,7 @@ export function useOsWorld() {
       clock: os.clock,
       running: os.running,
       cpuUtil: os.metrics.cpuUtil,
+      backendMode: os.memory.backendMode,
       cores: [
         {
           key: 'processor', title: '处理机', icon: 'Cpu', color: '#15a98a',

@@ -1256,7 +1256,7 @@ export function useOsDriver() {
     }
   }
   function setSpeed(s) { os.speed = s; if (os.running) schedule() }
-  function reset() {
+  async function reset() {
     pause()
     cpuTrace = null
     cpuTraceKey = ''
@@ -1275,7 +1275,21 @@ export function useOsDriver() {
     schedQuantumUsed = 0
     
     os.resetState()
+    await checkBackend()
+  }
+  async function checkBackend(silent = true) {
+    try {
+      const res = await fetch('/api/health')
+      if (res.ok) {
+        await Promise.all([prepareCpuTrace(os), prepareMemoryTrace(os)]).catch(() => {})
+        await refreshBankerSafety(os, !silent).catch(() => {})
+      } else {
+        os.memory.backendMode = 'local'
+      }
+    } catch (e) {
+      os.memory.backendMode = 'local'
+    }
   }
 
-  return { start, pause, step, setSpeed, reset }
+  return { start, pause, step, setSpeed, reset, checkBackend }
 }
