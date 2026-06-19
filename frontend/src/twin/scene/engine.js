@@ -3,6 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
 import { createPipeline } from './pipeline.js'
 import { createMaterials, disposeMaterials } from './materials.js'
+import { buildStage } from './stage.js'
+import { buildKernel } from './cores/kernel.js'
 
 const VIEW_H = 560
 
@@ -43,7 +45,7 @@ export function createTwinScene(container) {
   container.appendChild(labelRenderer.domElement)
 
   const controls = new OrbitControls(camera, pipeline.renderer.domElement)
-  controls.target.set(0, 1.2, 0)
+  controls.target.set(0, 0.8, 0)
   controls.enableDamping = true
   controls.dampingFactor = 0.06
   controls.maxPolarAngle = Math.PI / 2.1
@@ -89,20 +91,11 @@ export function createTwinScene(container) {
 
   // —— 建模内容（逐阶段扩展） ——
   function buildContents() {
-    // [Phase 1 临时] 镜面测试球，验证程序化环境反射；Phase 2 接入 stage 后移除。
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(2, 48, 48), materials.chrome)
-    ball.position.set(0, 2.2, 0)
-    ball.castShadow = true
-    scene.add(ball)
+    const stage = buildStage(scene, materials)
+    updaters.push(stage.update)
 
-    // [Phase 1 临时] 接收阴影的地面；Phase 2 由 stage 的主板替换。
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(80, 80),
-      new THREE.MeshStandardMaterial({ color: 0x070b14, roughness: 0.92, metalness: 0.1 }),
-    )
-    ground.rotation.x = -Math.PI / 2
-    ground.receiveShadow = true
-    scene.add(ground)
+    const kernel = buildKernel(scene, materials)
+    updaters.push(kernel.update)
   }
 
   // —— 对外接口 ——
