@@ -54,3 +54,11 @@ Desktop.ini
 
 # ==================== Screenshots ====================
 screenshots/
+
+# ==================== Diagrams ====================
+# PNG/SVG 由 .mmd 源文件通过 mmdc 生成，无需入 git
+docs/diagrams/*.png
+docs/diagrams/*.svg
+
+# ==================== Project Video ====================
+project-video/
