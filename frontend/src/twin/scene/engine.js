@@ -10,6 +10,7 @@ import { buildProcessor } from './cores/processor.js'
 import { buildMemory } from './cores/memory.js'
 import { buildDevice } from './cores/device.js'
 import { buildResource } from './cores/resource.js'
+import { setupInteractions } from './interactions.js'
 
 const VIEW_H = 560
 
@@ -67,8 +68,18 @@ export function createTwinScene(container) {
   // —— 每帧更新器集合：建模模块各自 push 一个 (world, t, dt) => void ——
   const updaters = []
   const cores = {}
+  const pickables = []
+  let interactions = null
 
   buildContents()
+
+  interactions = setupInteractions({
+    camera,
+    controls,
+    dom: pipeline.renderer.domElement,
+    pickables,
+    home: { pos: camera.position.clone(), look: controls.target.clone() },
+  })
 
   // —— 渲染循环（手动计时，避免已废弃的 THREE.Clock）——
   let raf = null
@@ -85,7 +96,9 @@ export function createTwinScene(container) {
     elapsed += dt
     const world = getWorldFn()
     for (let i = 0; i < updaters.length; i++) updaters[i](world, elapsed, dt)
-    controls.update()
+    // 聚焦补间期间由 interactions 独占相机，跳过 controls.update 以免被拉回
+    const tweening = interactions ? interactions.update(dt) : false
+    if (!tweening) controls.update()
     pipeline.render()
     labelRenderer.render(scene, camera)
   }
@@ -109,10 +122,17 @@ export function createTwinScene(container) {
 
     const kernel = buildKernel(scene, materials)
     updaters.push(kernel.update)
+    pickables.push({ key: 'kernel', object: kernel.group, focusPoint: new THREE.Vector3(0, 1.0, 0) })
 
     for (const key in CORE_BUILDERS) {
-      const inst = CORE_BUILDERS[key]({ scene, materials, position: CORE_POS[key] })
+      const pos = CORE_POS[key]
+      const inst = CORE_BUILDERS[key]({ scene, materials, position: pos })
       cores[key] = inst
+      pickables.push({
+        key,
+        object: inst.group,
+        focusPoint: new THREE.Vector3(pos[0], inst.focusOffset ? inst.focusOffset.y : 1, pos[1]),
+      })
       updaters.push((world, t, dt) => {
         const cs = world ? world.cores.find((c) => c.key === key) : null
         inst.update(cs, t, dt)
@@ -136,8 +156,8 @@ export function createTwinScene(container) {
     pipeline.setSize(w, height)
     labelRenderer.setSize(w, height)
   }
-  function focusCore() {
-    // Phase 4：interactions 接入相机补间
+  function focusCore(key) {
+    if (interactions) interactions.focus(key || null)
   }
 
   function onVisibility() {
@@ -156,6 +176,7 @@ export function createTwinScene(container) {
   }
   function dispose() {
     stop()
+    if (interactions) interactions.dispose()
     document.removeEventListener('visibilitychange', onVisibility)
     window.removeEventListener('resize', resize)
     controls.dispose()
@@ -201,7 +222,7 @@ export function createTwinScene(container) {
     }
   }
 
-  return { mount, resize, setView, focusCore, dispose, debug, snapshot }
+  return { mount, resize, setView, focusCore, dispose, debug, snapshot, intState: () => (interactions ? interactions.state() : null) }
 }
 
 function setupLights(scene) {

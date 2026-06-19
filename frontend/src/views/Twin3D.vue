@@ -31,6 +31,8 @@ onMounted(() => {
           if (b) b.click()
         }, 300)
       }
+      const focus = new URLSearchParams(location.search).get('focus')
+      if (focus) setTimeout(() => engine.focusCore(focus), 800)
     }
   } catch (e) {
     console.warn('[Twin3D] 初始化失败，回退 2D：', e)
