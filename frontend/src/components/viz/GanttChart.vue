@@ -4,10 +4,10 @@
       <svg :width="contentWidth" height="130" :viewBox="`0 0 ${contentWidth} 130`" class="gantt-svg">
         <g v-for="(seg, i) in gantt" :key="i">
           <rect :x="x(seg.开始)" y="34" :width="barWidth(seg)" height="44"
-            :fill="i <= reveal ? color(seg.作业) : '#eef1f7'"
-            :stroke="i === reveal ? '#1746a2' : '#fff'" :stroke-width="i === reveal ? 2 : 1" rx="3" />
-          <text v-if="i <= reveal" :x="(x(seg.开始) + x(seg.结束)) / 2" y="61" text-anchor="middle"
-            font-size="13" fill="#fff" font-weight="600">{{ seg.作业 }}</text>
+            :fill="i <= effectiveReveal ? color(seg.作业) : '#eef1f7'"
+            :stroke="i === effectiveReveal ? '#1746a2' : '#fff'" :stroke-width="i === effectiveReveal ? 2 : 1" rx="3" />
+          <text v-if="i <= effectiveReveal" :x="(x(seg.开始) + x(seg.结束)) / 2" y="61" text-anchor="middle"
+            font-size="13" :fill="seg.作业 === '空闲' ? '#9aa4b6' : '#fff'" font-weight="600">{{ seg.作业 }}</text>
           <text v-else :x="(x(seg.开始) + x(seg.结束)) / 2" y="61" text-anchor="middle"
             font-size="13" fill="#9aa4b6" font-weight="600">{{ seg.作业 }}</text>
         </g>
@@ -39,6 +39,10 @@ const scrollRef = ref(null)
 const viewportWidth = ref(734)
 let resizeObserver = null
 
+const effectiveReveal = computed(() => {
+  return props.reveal === -1 ? props.gantt.length - 1 : props.reveal
+})
+
 const maxTime = computed(() => Math.max(1, ...props.gantt.map((s) => s.结束)))
 const axisTime = computed(() => Math.max(visibleCycles, maxTime.value))
 const unitW = computed(() => {
@@ -55,6 +59,7 @@ function barWidth(seg) {
   return Math.max(4, (seg.结束 - seg.开始) * unitW.value)
 }
 function color(name) {
+  if (name === '空闲') return '#eef1f7'
   let h = 0
   for (const ch of String(name)) h = (h * 31 + ch.charCodeAt(0)) % palette.length
   return palette[h]
@@ -67,7 +72,8 @@ function measure() {
 
 function scrollToReveal() {
   const el = scrollRef.value
-  const seg = props.gantt[props.reveal]
+  const rev = props.reveal === -1 ? props.gantt.length - 1 : props.reveal
+  const seg = props.gantt[rev]
   if (!el || !seg) return
   const target = Math.max(0, x(seg.开始) - margin)
   const maxLeft = Math.max(0, el.scrollWidth - el.clientWidth)

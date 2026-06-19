@@ -148,6 +148,19 @@ function buildProcesses(config) {
       priority: Math.max(1, Number(p.priority) || 1),
     }))
 
+  const refString = parseRefString(config.refStringText)
+  const maxPage = Math.max(...refString)
+  const extAddr = (page) => '0' + String(11 + page).padStart(2, '0')
+
+  // 页表模板
+  const pageTableTemplate = []
+  for (let p = 0; p <= maxPage; p++) {
+    pageTableTemplate.push({
+      页号: p, 标志: 0, 主存块号: null, 访问位: 0, 修改位: 0,
+      外存地址: extAddr(p), loadTime: -1, lastUsed: -1,
+    })
+  }
+
   let started = false
   return source.map((p) => {
     let state = '新建'
@@ -162,6 +175,12 @@ function buildProcesses(config) {
       blockedReason: '',
       pageWaitingFor: null,
       blockedAt: null,
+      refString: [...refString], // 独立的页面访问流
+      refPtr: 0,
+      hits: 0,
+      faults: 0,
+      pageTable: pageTableTemplate.map(row => ({ ...row })), // 进程专属页表
+      lastReplace: { 访问页: null, 缺页: false, 调出页: null, 装入页: null, 装入块: null, 写回: false },
     }
   })
 }
@@ -185,6 +204,31 @@ export function seedState(cfg) {
   const used = memory.frames.filter((x) => x !== null).length
   const memUtil = Math.round((used / memory.capacity) * 100)
 
+  // 同步初始运行进程的页表以匹配暖机状态的物理内存页框
+  const initRunning = processes.find(p => p.state === '运行')
+  if (initRunning) {
+    initRunning.pageTable = memory.pageTable.map(row => ({ ...row }))
+  }
+
+  // 动态构建资源池矩阵，长度与 processes 一致
+  const numProcs = processes.length
+  const maxMatrix = []
+  const allocMatrix = []
+  for (let i = 0; i < numProcs; i++) {
+    if (i < 5) {
+      maxMatrix.push([...MAX[i]])
+      allocMatrix.push([...ALLOC[i]])
+    } else {
+      maxMatrix.push([
+        Math.floor(Math.random() * 4) + 1,
+        Math.floor(Math.random() * 4) + 1,
+        Math.floor(Math.random() * 3) + 1,
+      ])
+      allocMatrix.push([0, 0, 0])
+    }
+  }
+  const needMatrix = need(maxMatrix, allocMatrix)
+
   return {
     clock: 0,
     running: false,
@@ -202,9 +246,9 @@ export function seedState(cfg) {
     resources: {
       types: ['R0', 'R1', 'R2'],
       available: [3, 3, 2],
-      max: MAX,
-      allocation: ALLOC,
-      need: need(MAX, ALLOC),
+      max: maxMatrix,
+      allocation: allocMatrix,
+      need: needMatrix,
       safeSeq: [],
       deadlock: false,
     },

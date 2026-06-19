@@ -68,7 +68,7 @@
     </SectionCard>
 
     <SectionCard title="CPU 执行甘特图" icon="Histogram" style="margin-bottom: 14px;">
-      <GanttChart :gantt="os.gantt" :reveal="ganttReveal" />
+      <GanttChart :gantt="os.gantt" />
     </SectionCard>
 
     <el-row :gutter="14">
@@ -107,7 +107,10 @@
               <el-tag type="danger" effect="plain">{{ d.name }}</el-tag>
               <span class="io-meta">
                 <span>等待页号 <b>{{ d.page }}</b></span>
-                <span class="page-wait">已等待 {{ d.waited }} 拍 / 共 4 拍</span>
+                <span class="page-wait">
+                  <span v-if="d.total">已等待 {{ d.waited }} 拍 / 服务中 (共 {{ d.total }} 拍)</span>
+                  <span v-else>已等待 {{ d.waited }} 拍 / 磁盘排队中</span>
+                </span>
               </span>
             </li>
           </ul>
@@ -123,7 +126,11 @@
               </el-tooltip>
               <span class="io-meta">
                 <span>等待柱面 <b>{{ d.cyl }}</b></span>
-                <span class="dist">距磁头 {{ d.dist }} 柱</span>
+                <span class="dist">
+                  <span v-if="d.total">已等待 {{ d.waited }} 拍 / 服务中 (共 {{ d.total }} 拍)</span>
+                  <span v-else-if="d.waited !== undefined">已等待 {{ d.waited }} 拍 / 磁盘排队中 (距磁头 {{ d.dist }} 柱)</span>
+                  <span v-else>距磁头 {{ d.dist }} 柱</span>
+                </span>
               </span>
             </li>
           </ul>
@@ -149,36 +156,58 @@ const newProcs = computed(() => os.processes.filter((p) => p.state === '新建')
 const pageFaultDetails = computed(() => {
   return os.processes
     .filter((p) => p.state === '阻塞' && p.pageWaitingFor !== null && p.pageWaitingFor !== undefined)
-    .map((p) => ({
-      name: p.name,
-      page: p.pageWaitingFor,
-      waited: p.blockedAt != null ? Math.max(0, os.clock - p.blockedAt) : 0,
-    }))
-})
-
-// I/O 阻塞队列：仅取 disk.ioBlocked 中的进程 —— 源于"设备中断"，等待磁盘驱动调度
-const ioBlockedDetails = computed(() => {
-  const blockedNames = new Set(os.disk.ioBlocked || [])
-  return os.processes
-    .filter((p) => p.state === '阻塞' && blockedNames.has(p.name))
     .map((p) => {
-      const req = os.disk.queue.find((r) => r.进程名 === p.name)
-      const base = { name: p.name, reason: p.blockedReason || '等待磁盘 I/O' }
-      if (!req) return { ...base, cyl: '—', dist: '—' }
+      const active = os.disk.activeRequest
+      let total = null
+      if (active && active.进程名 === p.name && active.isPageFault) {
+        total = active.serviceTime
+      }
       return {
-        ...base,
-        cyl: req.柱面号,
-        dist: Math.abs(req.柱面号 - os.disk.head),
+        name: p.name,
+        page: p.pageWaitingFor,
+        waited: p.blockedAt != null ? Math.max(0, os.clock - p.blockedAt) : 0,
+        total: total
       }
     })
 })
 
-const ganttReveal = computed(() => {
-  for (let i = os.gantt.length - 1; i >= 0; i--) {
-    if (os.gantt[i].开始 < os.clock) return i
-  }
-  return -1
+// I/O 阻塞队列：仅取 disk.ioBlocked 中的进程且非缺页 —— 源于"设备中断"，等待磁盘驱动调度
+const ioBlockedDetails = computed(() => {
+  const blockedNames = new Set(os.disk.ioBlocked || [])
+  return os.processes
+    .filter((p) => p.state === '阻塞' && blockedNames.has(p.name) && (p.pageWaitingFor === null || p.pageWaitingFor === undefined))
+    .map((p) => {
+      const req = os.disk.queue.find((r) => r.进程名 === p.name && !r.isPageFault)
+      const base = { name: p.name, reason: p.blockedReason || '等待磁盘 I/O' }
+      const active = os.disk.activeRequest
+      
+      if (!req) {
+        if (active && active.进程名 === p.name && !active.isPageFault) {
+          return {
+            ...base,
+            cyl: active.柱面号,
+            dist: 0,
+            waited: p.blockedAt != null ? Math.max(0, os.clock - p.blockedAt) : 0,
+            total: active.serviceTime
+          }
+        }
+        return { ...base, cyl: '—', dist: '—' }
+      }
+      
+      let total = null
+      if (active && active.进程名 === p.name && !active.isPageFault) {
+        total = active.serviceTime
+      }
+      return {
+        ...base,
+        cyl: req.柱面号,
+        dist: Math.abs(req.柱面号 - os.disk.head),
+        waited: p.blockedAt != null ? Math.max(0, os.clock - p.blockedAt) : 0,
+        total: total
+      }
+    })
 })
+
 </script>
 
 <style scoped>
