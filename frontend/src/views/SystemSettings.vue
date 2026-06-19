@@ -119,7 +119,10 @@
               <el-form-item label="块长">
                 <el-input-number v-model="os.config.blockSize" :min="1" :max="4096" />
               </el-form-item>
-              <el-form-item label="页面访问串">
+              <el-form-item label="动态生成页面流">
+                <el-switch v-model="os.config.dynamicPages" active-text="启用 (模拟真实OS访存)" />
+              </el-form-item>
+              <el-form-item v-if="!os.config.dynamicPages" label="页面访问串">
                 <el-input
                   v-model="os.config.refStringText"
                   type="textarea"
@@ -127,7 +130,15 @@
                   placeholder="逗号分隔页号，例如：7,0,1,2,0,3"
                 />
               </el-form-item>
-              <p class="hint"><el-icon><InfoFilled /></el-icon> 解析后页数：{{ parsedRef.length }} · 最大页号：{{ maxPage }} · 参考：FIFO=15 / LRU=12 / OPT=9。</p>
+              <p class="hint">
+                <el-icon><InfoFilled /></el-icon>
+                <template v-if="os.config.dynamicPages">
+                  已启用动态页面访问流。每个进程将在初始化/重置时，自动生成符合时间与空间局部性规律的独立访存序列。
+                </template>
+                <template v-else>
+                  解析后页数：{{ parsedRef.length }} · 最大页号：{{ maxPage }} · 参考：FIFO=15 / LRU=12 / OPT=9。
+                </template>
+              </p>
             </template>
 
             <template v-else-if="activeExperimentId === 'disk'">
@@ -249,14 +260,26 @@
             <el-row :gutter="14" class="advanced-data">
               <el-col :xs="24" :md="10">
                 <div class="advanced-block">
-                  <h4>页面访问串</h4>
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <h4 style="margin: 0;">页面访问流</h4>
+                    <el-switch v-model="os.config.dynamicPages" size="small" active-text="动态生成" />
+                  </div>
                   <el-input
+                    v-if="!os.config.dynamicPages"
                     v-model="os.config.refStringText"
                     type="textarea"
                     :rows="4"
                     placeholder="逗号分隔的页号序列"
                   />
-                  <p class="hint"><el-icon><InfoFilled /></el-icon> 解析后页数：{{ parsedRef.length }} · 最大页号：{{ maxPage }}</p>
+                  <p class="hint">
+                    <el-icon><InfoFilled /></el-icon>
+                    <span v-if="os.config.dynamicPages">
+                      已启用动态模式：进程的页面序列由空间局部性（连续访问）和时间局部性（循环执行）算法动态生成。
+                    </span>
+                    <span v-else>
+                      解析后页数：{{ parsedRef.length }} · 最大页号：{{ maxPage }}
+                    </span>
+                  </p>
                 </div>
               </el-col>
 
@@ -326,7 +349,10 @@ const disk = ['FCFS', 'SSTF', 'SCAN', 'C-SCAN', 'LOOK', 'C-LOOK']
 
 const currentExperiment = computed(() => experimentById(activeExperimentId.value) || experiments[0])
 const parsedRef = computed(() => parseRefString(os.config.refStringText))
-const maxPage = computed(() => (parsedRef.value.length ? Math.max(...parsedRef.value) : 0))
+const maxPage = computed(() => {
+  if (os.config.dynamicPages) return 7
+  return parsedRef.value.length ? Math.max(...parsedRef.value) : 0
+})
 const processConfig = computed(() => os.config.processes || [])
 
 function selectExperiment(id) {
@@ -383,19 +409,21 @@ function loadExperiment(exp) {
   ElMessage.success('已加载：' + exp.title + '，可直接开始实验或继续调整关键输入')
 }
 
-function save() {
+async function save() {
   driver.pause()
   os.applyConfig()
+  await driver.checkBackend()
   ElMessage.success('配置已应用，模拟已按当前参数重建')
 }
-function startExperiment() {
+async function startExperiment() {
   driver.pause()
   os.applyConfig()
+  await driver.checkBackend()
   ElMessage.success('已开始：' + currentExperiment.value.title + '，请使用顶部“单步/运行”观察过程')
   router.push(currentExperiment.value.route)
 }
-function reset() {
-  driver.reset()
+async function reset() {
+  await driver.reset()
   activeExperimentId.value = 'paging'
   ElMessage.success('已恢复默认并重置模拟')
 }

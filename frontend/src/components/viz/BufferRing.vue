@@ -4,12 +4,20 @@
       <div class="sem">
         <div class="sem-label">s1 空闲缓冲</div>
         <div class="sem-val" :class="{ neg: s1 < 0 }">{{ s1 }}</div>
+        <div style="font-size: 10px; color: #b3bccd; margin-top: 2px;">信号量 (empty)</div>
       </div>
       <div class="sem">
         <div class="sem-label">s2 产品数</div>
         <div class="sem-val" :class="{ neg: s2 < 0 }">{{ s2 }}</div>
+        <div style="font-size: 10px; color: #b3bccd; margin-top: 2px;">信号量 (full)</div>
       </div>
-      <div style="flex: 1;">
+      <div class="sem">
+        <div class="sem-label">mutex 互斥量</div>
+        <div class="sem-val" :class="{ neg: mutex < 0 }">{{ mutex }}</div>
+        <div v-if="lockOwner" style="font-size: 10px; color: #e6a23c; margin-top: 2px; font-weight: 600;">🔑 {{ lockOwner }}</div>
+        <div v-else style="font-size: 10px; color: #b3bccd; margin-top: 2px;">🔓 空闲</div>
+      </div>
+      <div style="flex: 1; min-width: 150px;">
         <div style="font-size: 12px; color: #6b77a0; margin-bottom: 6px;">缓冲区（占用 {{ occupied }} / {{ capacity }}）</div>
         <div style="display: flex; gap: 5px; flex-wrap: wrap;">
           <div v-for="i in capacity" :key="i" class="slot" :class="{ filled: i <= occupied }">
@@ -21,17 +29,24 @@
 
     <div style="display: flex; gap: 24px; flex-wrap: wrap;">
       <div>
-        <div class="q-label">生产者阻塞队列</div>
+        <div class="q-label">生产者同步阻塞队列 (s1)</div>
         <div class="q-row">
           <el-tag v-for="(p, i) in prodBlocked" :key="i" type="warning" effect="plain" size="small">{{ p }}</el-tag>
           <span v-if="!prodBlocked.length" class="q-empty">空</span>
         </div>
       </div>
       <div>
-        <div class="q-label">消费者阻塞队列</div>
+        <div class="q-label">消费者同步阻塞队列 (s2)</div>
         <div class="q-row">
           <el-tag v-for="(p, i) in consBlocked" :key="i" type="danger" effect="plain" size="small">{{ p }}</el-tag>
           <span v-if="!consBlocked.length" class="q-empty">空</span>
+        </div>
+      </div>
+      <div>
+        <div class="q-label">临界区互斥锁阻塞队列 (mutex)</div>
+        <div class="q-row">
+          <el-tag v-for="(p, i) in mutexBlocked" :key="i" type="info" effect="plain" size="small">{{ p }}</el-tag>
+          <span v-if="!mutexBlocked.length" class="q-empty">空</span>
         </div>
       </div>
     </div>
@@ -49,14 +64,17 @@ const props = defineProps({
 const occupied = computed(() => props.state?.['缓冲区占用'] ?? 0)
 const s1 = computed(() => props.state?.['s1_空闲'] ?? props.capacity)
 const s2 = computed(() => props.state?.['s2_产品'] ?? 0)
+const mutex = computed(() => props.state?.['mutex_互斥'] ?? 1)
 const prodBlocked = computed(() => props.state?.['生产者阻塞队列'] || [])
 const consBlocked = computed(() => props.state?.['消费者阻塞队列'] || [])
+const mutexBlocked = computed(() => props.state?.['互斥阻塞队列'] || [])
+const lockOwner = computed(() => props.state?.['当前持锁进程'] || props.state?.['锁持有者'] || null)
 </script>
 
 <style scoped>
-.sem { background: #f5f8ff; border: 1px solid #e4ecfb; border-radius: 8px; padding: 8px 16px; text-align: center; }
+.sem { background: #f5f8ff; border: 1px solid #e4ecfb; border-radius: 8px; padding: 8px 14px; text-align: center; min-width: 90px; }
 .sem-label { font-size: 12px; color: #6b77a0; }
-.sem-val { font-size: 26px; font-weight: 700; color: #2f6fec; }
+.sem-val { font-size: 24px; font-weight: 700; color: #2f6fec; line-height: 1.2; }
 .sem-val.neg { color: #d4573c; }
 .slot { width: 34px; height: 34px; border: 1.5px dashed #c7d0e0; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #fff; }
 .slot.filled { background: #2f6fec; border-style: solid; border-color: #2f6fec; }

@@ -60,10 +60,23 @@
       <el-col :span="8">
         <SectionCard title="孪生数据源" icon="Connection">
           <ul class="ds">
-            <li><span>当前数据源</span><el-tag type="warning" effect="plain" size="small">Mock 驱动</el-tag></li>
-            <li><span>真实引擎</span><el-tag type="info" effect="plain" size="small">待接入</el-tag></li>
+            <li>
+              <span>当前数据源</span>
+              <el-tag :type="world.backendMode === 'backend' ? 'success' : 'warning'" effect="plain" size="small">
+                {{ world.backendMode === 'backend' ? '真实后端引擎' : 'Mock 驱动 (本地)' }}
+              </el-tag>
+            </li>
+            <li>
+              <span>真实引擎</span>
+              <el-tag :type="world.backendMode === 'backend' ? 'success' : 'info'" effect="plain" size="small">
+                {{ world.backendMode === 'backend' ? '已连接' : '未连接 (等待连接)' }}
+              </el-tag>
+            </li>
             <li><span>外部遥测</span><el-tag type="info" effect="plain" size="small">预留</el-tag></li>
-            <li><span>3D 场景</span><el-tag type="info" effect="plain" size="small">预留</el-tag></li>
+            <li>
+              <span>3D 场景</span>
+              <el-tag type="success" effect="plain" size="small">已启用 (Three.js)</el-tag>
+            </li>
           </ul>
         </SectionCard>
       </el-col>

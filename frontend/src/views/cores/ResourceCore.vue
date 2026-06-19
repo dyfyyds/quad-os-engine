@@ -51,10 +51,13 @@ const bankerFinal = computed(() => ({
 const syncState = computed(() => ({
   s1_空闲: os.sync.s1,
   s2_产品: os.sync.s2,
+  mutex_互斥: os.sync.mutex,
   缓冲区占用: os.sync.buffer,
   缓冲区容量: os.sync.capacity,
   生产者阻塞队列: os.sync.prodBlocked,
   消费者阻塞队列: os.sync.consBlocked,
+  互斥阻塞队列: os.sync.mutexBlocked,
+  当前持锁进程: os.sync.lockOwner,
 }))
 </script>
 

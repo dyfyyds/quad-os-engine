@@ -15,34 +15,112 @@ from app.schemas.common import SimulationStep, SimulationTrace
 
 def run(operations, buffer_size):
     n = buffer_size
-    s1 = n          # 空闲缓冲区
-    s2 = 0          # 产品数
+    s1 = n          # 空闲信号量
+    s2 = 0          # 产品信号量
+    mutex = 1       # 互斥信号量
     count = 0       # 缓冲区实际占用
     empty_q: list[str] = []   # 阻塞在 s1 上的生产者
     full_q: list[str] = []    # 阻塞在 s2 上的消费者
+    mutex_q: list[str] = []   # 阻塞在 mutex 上的进程
+    lock_owner: str | None = None
 
     stat = {"produced": 0, "consumed": 0, "blocked": 0}
     steps: list[SimulationStep] = []
 
-    def wake_producer(notes):
-        nonlocal count, s2
-        count += 1
-        stat["produced"] += 1
-        s2 += 1                       # V(s2)
-        if s2 <= 0 and full_q:
-            w = full_q.pop(0)
-            notes.append(f"V(s2) 唤醒消费者 {w}")
-            wake_consumer(notes)
+    def wake_producer(p_proc, notes_list):
+        nonlocal count, s2, mutex, lock_owner
+        notes_list.append(f"被唤醒生产者 {p_proc} 获得空闲槽")
+        # 尝试 P(mutex)
+        mutex -= 1
+        if mutex < 0:
+            mutex_q.append(p_proc)
+            notes_list.append(f"P(mutex) 后 mutex={mutex}<0，{p_proc} 进入互斥锁阻塞队列")
+        else:
+            lock_owner = p_proc
+            notes_list.append(f"{p_proc} 获得锁进入临界区，放入产品")
+            count += 1
+            stat["produced"] += 1
+            # V(mutex)
+            mutex += 1
+            lock_owner = None
+            if mutex <= 0 and mutex_q:
+                next_w = mutex_q.pop(0)
+                notes_list.append(f"V(mutex) 释放锁，唤醒互斥队列进程 {next_w}")
+                wake_mutex(next_w, notes_list)
+            # V(s2)
+            s2 += 1
+            if s2 <= 0 and full_q:
+                next_c = full_q.pop(0)
+                notes_list.append(f"V(s2) 唤醒消费者 {next_c}")
+                wake_consumer(next_c, notes_list)
 
-    def wake_consumer(notes):
-        nonlocal count, s1
-        count -= 1
-        stat["consumed"] += 1
-        s1 += 1                       # V(s1)
-        if s1 <= 0 and empty_q:
-            w = empty_q.pop(0)
-            notes.append(f"V(s1) 唤醒生产者 {w}")
-            wake_producer(notes)
+    def wake_consumer(c_proc, notes_list):
+        nonlocal count, s1, mutex, lock_owner
+        notes_list.append(f"被唤醒消费者 {c_proc} 获得产品")
+        # 尝试 P(mutex)
+        mutex -= 1
+        if mutex < 0:
+            mutex_q.append(c_proc)
+            notes_list.append(f"P(mutex) 后 mutex={mutex}<0，{c_proc} 进入互斥锁阻塞队列")
+        else:
+            lock_owner = c_proc
+            notes_list.append(f"{c_proc} 获得锁进入临界区，取出产品")
+            count -= 1
+            stat["consumed"] += 1
+            # V(mutex)
+            mutex += 1
+            lock_owner = None
+            if mutex <= 0 and mutex_q:
+                next_w = mutex_q.pop(0)
+                notes_list.append(f"V(mutex) 释放锁，唤醒互斥队列进程 {next_w}")
+                wake_mutex(next_w, notes_list)
+            # V(s1)
+            s1 += 1
+            if s1 <= 0 and empty_q:
+                next_p = empty_q.pop(0)
+                notes_list.append(f"V(s1) 唤醒生产者 {next_p}")
+                wake_producer(next_p, notes_list)
+
+    def wake_mutex(m_proc, notes_list):
+        nonlocal count, s1, s2, mutex, lock_owner
+        notes_list.append(f"互斥队列进程 {m_proc} 被唤醒并获得互斥锁")
+        lock_owner = m_proc
+        
+        is_prod = "producer" in m_proc.lower() or "生产者" in m_proc.lower() or "logger" in m_proc.lower() or "daemon" in m_proc.lower()
+        if is_prod:
+            count += 1
+            stat["produced"] += 1
+            notes_list.append(f"生产者 {m_proc} 放入产品，缓冲区占用 {count}")
+            # V(mutex)
+            mutex += 1
+            lock_owner = None
+            if mutex <= 0 and mutex_q:
+                next_w = mutex_q.pop(0)
+                notes_list.append(f"V(mutex) 释放锁，唤醒互斥队列进程 {next_w}")
+                wake_mutex(next_w, notes_list)
+            # V(s2)
+            s2 += 1
+            if s2 <= 0 and full_q:
+                next_c = full_q.pop(0)
+                notes_list.append(f"V(s2) 唤醒消费者 {next_c}")
+                wake_consumer(next_c, notes_list)
+        else:
+            count -= 1
+            stat["consumed"] += 1
+            notes_list.append(f"消费者 {m_proc} 取出产品，缓冲区占用 {count}")
+            # V(mutex)
+            mutex += 1
+            lock_owner = None
+            if mutex <= 0 and mutex_q:
+                next_w = mutex_q.pop(0)
+                notes_list.append(f"V(mutex) 释放锁，唤醒互斥队列进程 {next_w}")
+                wake_mutex(next_w, notes_list)
+            # V(s1)
+            s1 += 1
+            if s1 <= 0 and empty_q:
+                next_p = empty_q.pop(0)
+                notes_list.append(f"V(s1) 唤醒生产者 {next_p}")
+                wake_producer(next_p, notes_list)
 
     for idx, op in enumerate(operations):
         typ = op["type"]
@@ -56,14 +134,30 @@ def run(operations, buffer_size):
                 stat["blocked"] += 1
                 notes.append(f"P(s1) 后 s1={s1}<0，{proc} 阻塞（缓冲区满）")
             else:
-                count += 1
-                stat["produced"] += 1
-                s2 += 1               # V(s2)
-                if s2 <= 0 and full_q:
-                    w = full_q.pop(0)
-                    notes.append(f"V(s2) 唤醒消费者 {w}")
-                    wake_consumer(notes)
-                notes.append(f"{proc} 生产一件，缓冲区占用 {count}")
+                # P(mutex)
+                mutex -= 1
+                if mutex < 0:
+                    mutex_q.append(proc)
+                    stat["blocked"] += 1
+                    notes.append(f"P(mutex) 后 mutex={mutex}<0，{proc} 进入互斥锁阻塞队列")
+                else:
+                    lock_owner = proc
+                    count += 1
+                    stat["produced"] += 1
+                    notes.append(f"{proc} 生产一件，缓冲区占用 {count}")
+                    # V(mutex)
+                    mutex += 1
+                    lock_owner = None
+                    if mutex <= 0 and mutex_q:
+                        next_w = mutex_q.pop(0)
+                        notes.append(f"V(mutex) 释放锁，唤醒互斥队列进程 {next_w}")
+                        wake_mutex(next_w, notes)
+                    # V(s2)
+                    s2 += 1
+                    if s2 <= 0 and full_q:
+                        next_c = full_q.pop(0)
+                        notes.append(f"V(s2) 唤醒消费者 {next_c}")
+                        wake_consumer(next_c, notes)
         else:                         # consume
             s2 -= 1                   # P(s2)
             if s2 < 0:
@@ -71,22 +165,40 @@ def run(operations, buffer_size):
                 stat["blocked"] += 1
                 notes.append(f"P(s2) 后 s2={s2}<0，{proc} 阻塞（缓冲区空）")
             else:
-                count -= 1
-                stat["consumed"] += 1
-                s1 += 1               # V(s1)
-                if s1 <= 0 and empty_q:
-                    w = empty_q.pop(0)
-                    notes.append(f"V(s1) 唤醒生产者 {w}")
-                    wake_producer(notes)
-                notes.append(f"{proc} 消费一件，缓冲区占用 {count}")
+                # P(mutex)
+                mutex -= 1
+                if mutex < 0:
+                    mutex_q.append(proc)
+                    stat["blocked"] += 1
+                    notes.append(f"P(mutex) 后 mutex={mutex}<0，{proc} 进入互斥锁阻塞队列")
+                else:
+                    lock_owner = proc
+                    count -= 1
+                    stat["consumed"] += 1
+                    notes.append(f"{proc} 消费一件，缓冲区占用 {count}")
+                    # V(mutex)
+                    mutex += 1
+                    lock_owner = None
+                    if mutex <= 0 and mutex_q:
+                        next_w = mutex_q.pop(0)
+                        notes.append(f"V(mutex) 释放锁，唤醒互斥队列进程 {next_w}")
+                        wake_mutex(next_w, notes)
+                    # V(s1)
+                    s1 += 1
+                    if s1 <= 0 and empty_q:
+                        next_p = empty_q.pop(0)
+                        notes.append(f"V(s1) 唤醒生产者 {next_p}")
+                        wake_producer(next_p, notes)
 
         steps.append(
             SimulationStep(
                 index=idx,
                 description=f"[{proc}] " + "；".join(notes),
                 state={
-                    "s1_空闲": s1, "s2_产品": s2, "缓冲区占用": count, "缓冲区容量": n,
+                    "s1_空闲": s1, "s2_产品": s2, "mutex_互斥": mutex,
+                    "缓冲区占用": count, "缓冲区容量": n,
                     "生产者阻塞队列": empty_q.copy(), "消费者阻塞队列": full_q.copy(),
+                    "互斥阻塞队列": mutex_q.copy(), "锁持有者": lock_owner,
                     "已生产": stat["produced"], "已消费": stat["consumed"],
                 },
                 highlight={"操作": typ, "进程": proc},
@@ -100,11 +212,12 @@ def run(operations, buffer_size):
         "缓冲区占用": count,
         "s1_空闲": s1,
         "s2_产品": s2,
+        "mutex_互斥": mutex,
     }
     final_state = {
         "缓冲区容量": n, "缓冲区占用": count,
-        "生产者阻塞队列": empty_q, "消费者阻塞队列": full_q,
-        "s1_空闲": s1, "s2_产品": s2,
+        "生产者阻塞队列": empty_q, "消费者阻塞队列": full_q, "互斥阻塞队列": mutex_q,
+        "s1_空闲": s1, "s2_产品": s2, "mutex_互斥": mutex, "锁持有者": lock_owner,
     }
     return SimulationTrace(
         module="sync",
