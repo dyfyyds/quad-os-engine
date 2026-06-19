@@ -971,22 +971,17 @@ async function serveBankerRequest(os, proc) {
   }
 }
 
-// ———————————————————————— 同步：PV 生产者-消费者（与调度挂钩） ————————————————————————
+// ———————————————————————— 同步：PV 生产者-消费者（与调度挂钩，支持 Mutex 互斥临界区） ————————————————————————
 
 function pvWakeConsumer(s, os, w) {
   const p = os.processes.find(x => x.name === w)
   if (p) {
     p.state = '就绪'
     p.blockedReason = ''
+    p.syncPhase = 1 // 唤醒并授予 s2，准备请求 mutex 锁
     if (os.config.schedAlgo === 'RR' && !schedRrQueue.includes(p.pid)) {
       schedRrQueue.push(p.pid)
     }
-  }
-  s.buffer--; s.consumed++; s.s1++
-  if (s.s1 <= 0 && s.prodBlocked.length) {
-    const nextW = s.prodBlocked.shift()
-    os.pushEvent('同步唤醒', 'resource', 'info', `V(s1) 唤醒生产者 ${nextW}`)
-    pvWakeProducer(s, os, nextW)
   }
 }
 
@@ -995,55 +990,123 @@ function pvWakeProducer(s, os, w) {
   if (p) {
     p.state = '就绪'
     p.blockedReason = ''
+    p.syncPhase = 1 // 唤醒并授予 s1，准备请求 mutex 锁
     if (os.config.schedAlgo === 'RR' && !schedRrQueue.includes(p.pid)) {
       schedRrQueue.push(p.pid)
     }
   }
-  s.buffer++; s.produced++; s.s2++
-  if (s.s2 <= 0 && s.consBlocked.length) {
-    const nextW = s.consBlocked.shift()
-    os.pushEvent('同步唤醒', 'resource', 'info', `V(s2) 唤醒消费者 ${nextW}`)
-    pvWakeConsumer(s, os, nextW)
+}
+
+function pvWakeMutex(s, os, w) {
+  const p = os.processes.find(x => x.name === w)
+  if (p) {
+    p.state = '就绪'
+    p.blockedReason = ''
+    p.syncPhase = 2 // 唤醒并授予互斥锁，直接进入临界区操作
+    s.lockOwner = p.name
+    if (os.config.schedAlgo === 'RR' && !schedRrQueue.includes(p.pid)) {
+      schedRrQueue.push(p.pid)
+    }
   }
 }
 
-function pvProduce(s, proc, os) {
-  s.s1--
-  if (s.s1 < 0) {
-    s.prodBlocked.push(proc)
-    os.pushEvent('生产阻塞', 'resource', 'warning', `P(s1) 缓冲区满，生产者 ${proc} 进入同步阻塞`)
-    const p = os.processes.find(x => x.name === proc)
-    if (p) {
-      p.state = '阻塞'
-      p.blockedReason = 'PV同步阻塞: 缓冲区满'
+function pvProduce(s, proc, os, procObj) {
+  if (procObj.syncPhase === 0) {
+    s.s1--
+    if (s.s1 < 0) {
+      s.prodBlocked.push(proc)
+      os.pushEvent('生产阻塞', 'resource', 'warning', `P(s1) 缓冲区满，生产者 ${proc} 挂起等待空闲槽`)
+      procObj.state = '阻塞'
+      procObj.blockedReason = 'PV同步阻塞: 等待空闲槽 (s1)'
+      return
     }
-  } else {
-    s.buffer++; s.produced++; s.s2++
+    procObj.syncPhase = 1
+  }
+
+  if (procObj.syncPhase === 1) {
+    s.mutex--
+    if (s.mutex < 0) {
+      s.mutexBlocked.push(proc)
+      os.pushEvent('互斥阻塞', 'resource', 'warning', `P(mutex) 临界区已被占用，生产者 ${proc} 挂起等待锁`)
+      procObj.state = '阻塞'
+      procObj.blockedReason = 'PV互斥阻塞: 等待临界锁 (mutex)'
+      return
+    }
+    s.lockOwner = proc
+    procObj.syncPhase = 2
+  }
+
+  if (procObj.syncPhase === 2) {
+    s.buffer++
+    s.produced++
+    os.pushEvent('生产写入', 'resource', 'info', `生产者 ${proc} 获锁进入临界区，放入产品，缓冲区占用 ${s.buffer}`)
+
+    s.mutex++
+    s.lockOwner = null
+    if (s.mutex <= 0 && s.mutexBlocked.length) {
+      const nextW = s.mutexBlocked.shift()
+      os.pushEvent('互斥唤醒', 'resource', 'info', `V(mutex) 释放锁，唤醒互斥队列进程 ${nextW}`)
+      pvWakeMutex(s, os, nextW)
+    }
+
+    s.s2++
     if (s.s2 <= 0 && s.consBlocked.length) {
-      const w = s.consBlocked.shift()
-      os.pushEvent('同步唤醒', 'resource', 'info', `V(s2) 唤醒消费者 ${w}`)
-      pvWakeConsumer(s, os, w)
+      const nextC = s.consBlocked.shift()
+      os.pushEvent('同步唤醒', 'resource', 'info', `V(s2) 产生新产品，唤醒等待消费者 ${nextC}`)
+      pvWakeConsumer(s, os, nextC)
     }
+
+    procObj.syncPhase = 0
   }
 }
 
-function pvConsume(s, proc, os) {
-  s.s2--
-  if (s.s2 < 0) {
-    s.consBlocked.push(proc)
-    os.pushEvent('消费阻塞', 'resource', 'warning', `P(s2) 缓冲区空，消费者 ${proc} 进入同步阻塞`)
-    const p = os.processes.find(x => x.name === proc)
-    if (p) {
-      p.state = '阻塞'
-      p.blockedReason = 'PV同步阻塞: 缓冲区空'
+function pvConsume(s, proc, os, procObj) {
+  if (procObj.syncPhase === 0) {
+    s.s2--
+    if (s.s2 < 0) {
+      s.consBlocked.push(proc)
+      os.pushEvent('消费阻塞', 'resource', 'warning', `P(s2) 缓冲区空，消费者 ${proc} 挂起等待产品`)
+      procObj.state = '阻塞'
+      procObj.blockedReason = 'PV同步阻塞: 等待产品 (s2)'
+      return
     }
-  } else {
-    s.buffer--; s.consumed++; s.s1++
+    procObj.syncPhase = 1
+  }
+
+  if (procObj.syncPhase === 1) {
+    s.mutex--
+    if (s.mutex < 0) {
+      s.mutexBlocked.push(proc)
+      os.pushEvent('互斥阻塞', 'resource', 'warning', `P(mutex) 临界区已被占用，消费者 ${proc} 挂起等待锁`)
+      procObj.state = '阻塞'
+      procObj.blockedReason = 'PV互斥阻塞: 等待临界锁 (mutex)'
+      return
+    }
+    s.lockOwner = proc
+    procObj.syncPhase = 2
+  }
+
+  if (procObj.syncPhase === 2) {
+    s.buffer--
+    s.consumed++
+    os.pushEvent('消费取出', 'resource', 'info', `消费者 ${proc} 获锁进入临界区，取出产品，缓冲区占用 ${s.buffer}`)
+
+    s.mutex++
+    s.lockOwner = null
+    if (s.mutex <= 0 && s.mutexBlocked.length) {
+      const nextW = s.mutexBlocked.shift()
+      os.pushEvent('互斥唤醒', 'resource', 'info', `V(mutex) 释放锁，唤醒互斥队列进程 ${nextW}`)
+      pvWakeMutex(s, os, nextW)
+    }
+
+    s.s1++
     if (s.s1 <= 0 && s.prodBlocked.length) {
-      const w = s.prodBlocked.shift()
-      os.pushEvent('同步唤醒', 'resource', 'info', `V(s1) 唤醒生产者 ${w}`)
-      pvWakeProducer(s, os, w)
+      const nextP = s.prodBlocked.shift()
+      os.pushEvent('同步唤醒', 'resource', 'info', `V(s1) 释放空闲槽，唤醒等待生产者 ${nextP}`)
+      pvWakeProducer(s, os, nextP)
     }
+
+    procObj.syncPhase = 0
   }
 }
 
@@ -1062,13 +1125,13 @@ function isConsumer(proc) {
 function syncProduce(os, running) {
   if (!running || !running.name) return
   const s = os.sync
-  pvProduce(s, running.name, os)
+  pvProduce(s, running.name, os, running)
 }
 
 function syncConsume(os, running) {
   if (!running || !running.name) return
   const s = os.sync
-  pvConsume(s, running.name, os)
+  pvConsume(s, running.name, os, running)
 }
 
 function addDeterministicArrival(os, t) {

@@ -5,6 +5,50 @@
  * 让「系统设置」页保存配置后真正驱动模拟（详见 store.applyConfig 与 docs/接口契约.md）。
  */
 
+// 动态页面流生成器：模拟真实 OS 程序的访存特征（时间局部性、空间局部性、不可预测分支）
+export function generateDynamicRefString(length = 20, maxPage = 7) {
+  const refs = []
+  let currentPage = Math.floor(Math.random() * (maxPage + 1))
+  
+  while (refs.length < length) {
+    const rand = Math.random()
+    if (rand < 0.45) {
+      // 1. 空间局部性：顺序访问相邻页面 (例如数组遍历、指令顺序执行)
+      const subLen = Math.min(3 + Math.floor(Math.random() * 4), length - refs.length)
+      const direction = Math.random() < 0.5 ? 1 : -1
+      for (let i = 0; i < subLen; i++) {
+        currentPage = (currentPage + direction + maxPage + 1) % (maxPage + 1)
+        refs.push(currentPage)
+      }
+    } else if (rand < 0.85) {
+      // 2. 时间局部性：循环访问一小组页面 (例如循环体中的代码或变量)
+      const loopLen = 2 + Math.floor(Math.random() * 2) // 2 或 3 个页面
+      const loopPages = []
+      for (let i = 0; i < loopLen; i++) {
+        loopPages.push(Math.floor(Math.random() * (maxPage + 1)))
+      }
+      const iterations = Math.min(2 + Math.floor(Math.random() * 3), Math.ceil((length - refs.length) / loopLen))
+      for (let r = 0; r < iterations; r++) {
+        for (const p of loopPages) {
+          if (refs.length < length) {
+            refs.push(p)
+          }
+        }
+      }
+    } else {
+      // 3. 不可预测分支跳转：模拟 if-else 分支转移
+      const pA = Math.floor(Math.random() * (maxPage + 1))
+      const pB = Math.floor(Math.random() * (maxPage + 1))
+      const count = Math.min(2 + Math.floor(Math.random() * 3), length - refs.length)
+      for (let i = 0; i < count; i++) {
+        const p = Math.random() < 0.7 ? pA : pB // 70% 走主分支，30% 走备用分支
+        refs.push(p)
+      }
+    }
+  }
+  return refs
+}
+
 // —— 出厂默认配置（也是「重置模拟」的基线）——
 export const DEFAULT_CONFIG = {
   quantum: 2,
@@ -19,6 +63,7 @@ export const DEFAULT_CONFIG = {
   diskAlgo: 'SCAN',
   clockSpeed: 1,
   processAutoArrival: false,
+  dynamicPages: true,    // 是否启用动态页面访问流（模拟真实OS访存）
   // —— 可编辑的实验数据 ——
   processes: [                                       // 处理机调度实验进程表
     { pid: 1, name: 'init', arrival: 0, burst: 12, priority: 1 },
@@ -59,9 +104,11 @@ const extAddr = (page) => '0' + String(11 + page).padStart(2, '0')
 
 // —— 存储核心：由 config 构建页表/页框（含修改位、访问位、外存地址）——
 function buildMemory(config) {
-  const refString = parseRefString(config.refStringText)
+  const refString = config.dynamicPages
+    ? generateDynamicRefString(20, 7)
+    : parseRefString(config.refStringText)
   const frameCount = Math.max(1, config.frameCount | 0)
-  const maxPage = Math.max(...refString)
+  const maxPage = config.dynamicPages ? 7 : Math.max(...refString)
 
   // 页表：每个出现过的页号一行（页号 / 标志 / 主存块号 / 访问位 / 修改位 / 外存地址）
   const pageTable = []
@@ -148,18 +195,9 @@ function buildProcesses(config) {
       priority: Math.max(1, Number(p.priority) || 1),
     }))
 
-  const refString = parseRefString(config.refStringText)
-  const maxPage = Math.max(...refString)
+  const isDynamic = !!config.dynamicPages
+  const globalRef = parseRefString(config.refStringText)
   const extAddr = (page) => '0' + String(11 + page).padStart(2, '0')
-
-  // 页表模板
-  const pageTableTemplate = []
-  for (let p = 0; p <= maxPage; p++) {
-    pageTableTemplate.push({
-      页号: p, 标志: 0, 主存块号: null, 访问位: 0, 修改位: 0,
-      外存地址: extAddr(p), loadTime: -1, lastUsed: -1,
-    })
-  }
 
   let started = false
   return source.map((p) => {
@@ -168,6 +206,20 @@ function buildProcesses(config) {
       state = started ? '就绪' : '运行'
       started = true
     }
+    
+    // 如果启用动态页面模式，为每个进程单独生成符合局部性原理的独立序列
+    const procRefString = isDynamic ? generateDynamicRefString(20, 7) : [...globalRef]
+    const procMaxPage = isDynamic ? 7 : Math.max(...procRefString)
+
+    // 生成当前进程的专属页表
+    const pageTable = []
+    for (let pageIdx = 0; pageIdx <= procMaxPage; pageIdx++) {
+      pageTable.push({
+        页号: pageIdx, 标志: 0, 主存块号: null, 访问位: 0, 修改位: 0,
+        外存地址: extAddr(pageIdx), loadTime: -1, lastUsed: -1,
+      })
+    }
+
     return {
       ...p,
       state,
@@ -175,11 +227,12 @@ function buildProcesses(config) {
       blockedReason: '',
       pageWaitingFor: null,
       blockedAt: null,
-      refString: [...refString], // 独立的页面访问流
+      refString: procRefString,
       refPtr: 0,
       hits: 0,
       faults: 0,
-      pageTable: pageTableTemplate.map(row => ({ ...row })), // 进程专属页表
+      pageTable,
+      syncPhase: 0,
       lastReplace: { 访问页: null, 缺页: false, 调出页: null, 装入页: null, 装入块: null, 写回: false },
     }
   })
@@ -253,8 +306,20 @@ export function seedState(cfg) {
       deadlock: false,
     },
 
-    // —— 进程同步（PV）—— 缓冲区取小值，让 P/V 阻塞与唤醒可见（s1 初值 = 容量）
-    sync: { capacity: 4, s1: 4, s2: 0, buffer: 0, produced: 0, consumed: 0, prodBlocked: [], consBlocked: [] },
+    // —— 进程同步（PV）—— 缓冲区容量4，s1初值4，s2初值0，互斥量mutex初值1
+    sync: {
+      capacity: 4,
+      s1: 4,
+      s2: 0,
+      mutex: 1,
+      buffer: 0,
+      produced: 0,
+      consumed: 0,
+      prodBlocked: [],
+      consBlocked: [],
+      mutexBlocked: [],
+      lockOwner: null
+    },
 
     // —— 设备核心（磁盘驱动调度）——
     disk,
