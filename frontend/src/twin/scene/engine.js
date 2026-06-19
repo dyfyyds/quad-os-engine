@@ -5,8 +5,20 @@ import { createPipeline } from './pipeline.js'
 import { createMaterials, disposeMaterials } from './materials.js'
 import { buildStage } from './stage.js'
 import { buildKernel } from './cores/kernel.js'
+import { CORE_POS } from './layout.js'
+import { buildProcessor } from './cores/processor.js'
+import { buildMemory } from './cores/memory.js'
+import { buildDevice } from './cores/device.js'
+import { buildResource } from './cores/resource.js'
 
 const VIEW_H = 560
+
+const CORE_BUILDERS = {
+  processor: buildProcessor,
+  memory: buildMemory,
+  resource: buildResource,
+  device: buildDevice,
+}
 
 /**
  * 数字孪生 3D 引擎编排器（渲染无关接缝的「3D 渲染器」实现）。
@@ -54,6 +66,7 @@ export function createTwinScene(container) {
 
   // —— 每帧更新器集合：建模模块各自 push 一个 (world, t, dt) => void ——
   const updaters = []
+  const cores = {}
 
   buildContents()
 
@@ -96,6 +109,15 @@ export function createTwinScene(container) {
 
     const kernel = buildKernel(scene, materials)
     updaters.push(kernel.update)
+
+    for (const key in CORE_BUILDERS) {
+      const inst = CORE_BUILDERS[key]({ scene, materials, position: CORE_POS[key] })
+      cores[key] = inst
+      updaters.push((world, t, dt) => {
+        const cs = world ? world.cores.find((c) => c.key === key) : null
+        inst.update(cs, t, dt)
+      })
+    }
   }
 
   // —— 对外接口 ——

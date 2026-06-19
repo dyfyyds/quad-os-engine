@@ -18,7 +18,20 @@ onMounted(() => {
   try {
     engine = createTwinScene(container.value)
     engine.mount(() => world.value)
-    if (import.meta.env.DEV) window.__twin = engine
+    if (import.meta.env.DEV) {
+      window.__twin = engine
+      // 开发期可视化验证钩子：?dev=run 自动运行、?dev=deadlock 强制死锁
+      const dev = new URLSearchParams(location.search).get('dev') || ''
+      if (dev.includes('deadlock')) {
+        import('../store/os').then(({ useOsStore }) => { useOsStore().resources.deadlock = true })
+      }
+      if (dev.includes('run')) {
+        setTimeout(() => {
+          const b = [...document.querySelectorAll('button')].find((x) => (x.textContent || '').trim() === '运行')
+          if (b) b.click()
+        }, 300)
+      }
+    }
   } catch (e) {
     console.warn('[Twin3D] 初始化失败，回退 2D：', e)
     failed.value = true
