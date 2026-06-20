@@ -3,31 +3,38 @@
  *
  * seedState(cfg) —— 不传参用出厂默认；传入 config 时按其重建 memory/disk，
  * 让「系统设置」页保存配置后真正驱动模拟（详见 store.applyConfig 与 docs/接口契约.md）。
+ *
+ * 确定性：所有「随机」初始化均走传入的种子 PRNG（makeRng），使整段仿真可复现，
+ * 并与后端整拍引擎前后端 parity 一致（详见 docs/superpowers/specs/2026-06-20-...）。
  */
+import { makeRng } from './rng.js'
+
+// 未显式传 rng 时的兜底（保持旧的非确定性行为，仅供 seed.js 之外的偶发调用）。
+const MATH_RNG = { next: () => Math.random() }
 
 // 动态页面流生成器：模拟真实 OS 程序的访存特征（时间局部性、空间局部性、不可预测分支）
-export function generateDynamicRefString(length = 20, maxPage = 7) {
+export function generateDynamicRefString(length = 20, maxPage = 7, rng = MATH_RNG) {
   const refs = []
-  let currentPage = Math.floor(Math.random() * (maxPage + 1))
-  
+  let currentPage = Math.floor(rng.next() * (maxPage + 1))
+
   while (refs.length < length) {
-    const rand = Math.random()
+    const rand = rng.next()
     if (rand < 0.45) {
       // 1. 空间局部性：顺序访问相邻页面 (例如数组遍历、指令顺序执行)
-      const subLen = Math.min(3 + Math.floor(Math.random() * 4), length - refs.length)
-      const direction = Math.random() < 0.5 ? 1 : -1
+      const subLen = Math.min(3 + Math.floor(rng.next() * 4), length - refs.length)
+      const direction = rng.next() < 0.5 ? 1 : -1
       for (let i = 0; i < subLen; i++) {
         currentPage = (currentPage + direction + maxPage + 1) % (maxPage + 1)
         refs.push(currentPage)
       }
     } else if (rand < 0.85) {
       // 2. 时间局部性：循环访问一小组页面 (例如循环体中的代码或变量)
-      const loopLen = 2 + Math.floor(Math.random() * 2) // 2 或 3 个页面
+      const loopLen = 2 + Math.floor(rng.next() * 2) // 2 或 3 个页面
       const loopPages = []
       for (let i = 0; i < loopLen; i++) {
-        loopPages.push(Math.floor(Math.random() * (maxPage + 1)))
+        loopPages.push(Math.floor(rng.next() * (maxPage + 1)))
       }
-      const iterations = Math.min(2 + Math.floor(Math.random() * 3), Math.ceil((length - refs.length) / loopLen))
+      const iterations = Math.min(2 + Math.floor(rng.next() * 3), Math.ceil((length - refs.length) / loopLen))
       for (let r = 0; r < iterations; r++) {
         for (const p of loopPages) {
           if (refs.length < length) {
@@ -37,11 +44,11 @@ export function generateDynamicRefString(length = 20, maxPage = 7) {
       }
     } else {
       // 3. 不可预测分支跳转：模拟 if-else 分支转移
-      const pA = Math.floor(Math.random() * (maxPage + 1))
-      const pB = Math.floor(Math.random() * (maxPage + 1))
-      const count = Math.min(2 + Math.floor(Math.random() * 3), length - refs.length)
+      const pA = Math.floor(rng.next() * (maxPage + 1))
+      const pB = Math.floor(rng.next() * (maxPage + 1))
+      const count = Math.min(2 + Math.floor(rng.next() * 3), length - refs.length)
       for (let i = 0; i < count; i++) {
-        const p = Math.random() < 0.7 ? pA : pB // 70% 走主分支，30% 走备用分支
+        const p = rng.next() < 0.7 ? pA : pB // 70% 走主分支，30% 走备用分支
         refs.push(p)
       }
     }
@@ -62,6 +69,7 @@ export const DEFAULT_CONFIG = {
   pageAlgo: 'LRU',
   diskAlgo: 'SCAN',
   clockSpeed: 1,
+  rngSeed: 0x9e3779b9,   // 种子 PRNG 初值（决定整段仿真的"随机"序列，可复现）
   processAutoArrival: false,
   dynamicPages: true,    // 是否启用动态页面访问流（模拟真实OS访存）
   // —— 可编辑的实验数据 ——
@@ -103,9 +111,9 @@ export function parseRefString(text) {
 const extAddr = (page) => '0' + String(11 + page).padStart(2, '0')
 
 // —— 存储核心：由 config 构建页表/页框（含修改位、访问位、外存地址）——
-function buildMemory(config) {
+function buildMemory(config, rng) {
   const refString = config.dynamicPages
-    ? generateDynamicRefString(20, 7)
+    ? generateDynamicRefString(20, 7, rng)
     : parseRefString(config.refStringText)
   const frameCount = Math.max(1, config.frameCount | 0)
   const maxPage = config.dynamicPages ? 7 : Math.max(...refString)
@@ -185,7 +193,7 @@ function buildDisk(config) {
   }
 }
 
-function buildProcesses(config) {
+function buildProcesses(config, rng) {
   const source = (config.processes && config.processes.length ? config.processes : DEFAULT_CONFIG.processes)
     .map((p, i) => ({
       pid: Number(p.pid) || i + 1,
@@ -208,7 +216,7 @@ function buildProcesses(config) {
     }
     
     // 如果启用动态页面模式，为每个进程单独生成符合局部性原理的独立序列
-    const procRefString = isDynamic ? generateDynamicRefString(20, 7) : [...globalRef]
+    const procRefString = isDynamic ? generateDynamicRefString(20, 7, rng) : [...globalRef]
     const procMaxPage = isDynamic ? 7 : Math.max(...procRefString)
 
     // 生成当前进程的专属页表
@@ -250,9 +258,12 @@ export function seedState(cfg) {
     priority: Math.max(1, Number(p.priority) || 1),
   }))
 
-  const memory = buildMemory(config)
+  const rngState0 = (config.rngSeed ?? 0x9e3779b9) >>> 0
+  const rng = makeRng(rngState0)
+
+  const memory = buildMemory(config, rng)
   const disk = buildDisk(config)
-  const processes = buildProcesses(config)
+  const processes = buildProcesses(config, rng)
   const maxPid = processes.reduce((max, p) => Math.max(max, p.pid), 0)
   const used = memory.frames.filter((x) => x !== null).length
   const memUtil = Math.round((used / memory.capacity) * 100)
@@ -273,9 +284,9 @@ export function seedState(cfg) {
       allocMatrix.push([...ALLOC[i]])
     } else {
       maxMatrix.push([
-        Math.floor(Math.random() * 4) + 1,
-        Math.floor(Math.random() * 4) + 1,
-        Math.floor(Math.random() * 3) + 1,
+        Math.floor(rng.next() * 4) + 1,
+        Math.floor(rng.next() * 4) + 1,
+        Math.floor(rng.next() * 3) + 1,
       ])
       allocMatrix.push([0, 0, 0])
     }
@@ -286,6 +297,8 @@ export function seedState(cfg) {
     clock: 0,
     running: false,
     speed: config.clockSpeed || 1,
+    rngState: rng.state >>> 0,                                   // 种子 PRNG 当前状态（随 tick 推进）
+    scheduler: { rrQueue: [], currentPid: null, quantumUsed: 0 }, // 调度器状态（原 driver 模块级变量上提，可序列化）
 
     // —— 处理机核心 ——
     processes,
