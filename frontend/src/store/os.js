@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { seedState } from '../mock/seed'
+import { api } from '../api/client'
 
 // —— 实验配置持久化：跨「顶栏刷新 / 浏览器重载」保留系统设置中的参数 ——
 const CONFIG_KEY = 'quad-os:config'
@@ -159,10 +160,33 @@ export const useOsStore = defineStore('os', {
     resetRun() {
       this.$state = seedState(this.config)
     },
-    // 按当前（已编辑）config 重建 memory/disk 并持久化 —— 系统设置「应用配置」即生效
-    applyConfig() {
-      saveConfig(this.config)
-      this.$state = seedState(this.config)
+    // 系统设置「应用配置」：后端为主（先写 DB），无论成败都写本地缓存兜底，再按 config 重建。
+    async applyConfig() {
+      const cfg = this.config
+      let warn = ''
+      try {
+        await api.putConfig(cfg)
+      } catch (e) {
+        warn = e?.message || '后端不可用'
+      }
+      saveConfig(cfg)                 // 本地缓存（兜底）
+      this.$state = seedState(cfg)    // 按配置重建运行态（会重置 events）
+      if (warn) {
+        this.pushEvent('配置回退', 'system', 'warning', `配置仅保存到本地（${warn}）`)
+      }
+    },
+    // 启动时拉取后端配置；有则以后端为主覆盖本地，无/失败则保持本地。
+    async hydrateFromServer() {
+      let r
+      try {
+        r = await api.getConfig()
+      } catch (e) {
+        return                        // 后端不可用或 404 → 保持本地/默认
+      }
+      if (r && r.config) {
+        saveConfig(r.config)
+        this.$state = seedState(r.config)
+      }
     },
   },
 })
