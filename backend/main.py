@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import (banker, disk, history, paging, presets, process, report,
+from app.api import (banker, config, disk, history, paging, presets, process, report,
                      scenarios, scheduling, sync)
 
 
@@ -35,7 +35,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (scheduling, banker, paging, disk, sync, process, presets, report, scenarios, history):
+for module in (scheduling, banker, paging, disk, sync, process, presets, report, scenarios, history, config):
     app.include_router(module.router)
 
 
