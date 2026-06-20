@@ -355,7 +355,7 @@ function applyCpuTrace(os) {
       } else if (algo === 'HRRN') {
         const getRatio = (p) => {
           const wait = Math.max(0, time - p.arrival)
-          const service = p.burst - p.ran
+          const service = p.burst
           return (wait + service) / Math.max(1, service)
         }
         chosen = readyProcs.sort((a, b) => getRatio(b) - getRatio(a) || a.pid - b.pid)[0]
@@ -769,52 +769,176 @@ function recomputeDiskBusyRate(os) {
 }
 
 /**
- * 磁盘寻道调度与物理计时器模拟
+ * 磁盘寻道调度与物理计时器模拟（支持后端实时运算 + 本地等价算法兜底）
  */
-function serveDisk(os) {
+async function serveDisk(os) {
   const d = os.disk
   if (!d.queue.length || d.activeRequest) return
 
   let chosenIdx = 0
   const algo = os.config.diskAlgo
+  let seek = 0
+  let useBackend = false
 
-  if (algo === 'SSTF') {
-    let minDist = Infinity
-    d.queue.forEach((r, idx) => {
-      const dist = Math.abs(r.柱面号 - d.head)
-      if (dist < minDist) { minDist = dist; chosenIdx = idx }
-    })
-  } else if (algo === 'SCAN' || algo === 'LOOK') {
-    const dir = d.direction || 1
-    let bestIdx = -1
-    let bestDist = Infinity
-    d.queue.forEach((r, idx) => {
-      const dist = r.柱面号 - d.head
-      if ((dir > 0 && dist >= 0) || (dir < 0 && dist <= 0)) {
-        const absDist = Math.abs(dist)
-        if (absDist < bestDist) { bestDist = absDist; bestIdx = idx }
+  // 1. 优先尝试调用后端接口进行寻道决策与计算
+  if (os.memory.backendMode === 'backend') {
+    try {
+      const trace = await api.disk({
+        algorithm: algo,
+        requests: d.queue.map(r => r.柱面号),
+        head: d.head,
+        disk_size: d.cylinders,
+        direction: d.direction === -1 ? 'down' : 'up'
+      })
+      if (trace && trace.steps && trace.steps.length > 0) {
+        const serviceStepIdx = trace.steps.findIndex(s => s.state["是否服务请求"] === true)
+        if (serviceStepIdx >= 0) {
+          const nextCylinder = trace.steps[serviceStepIdx].state["当前磁头"]
+          const idx = d.queue.findIndex(r => r.柱面号 === nextCylinder)
+          if (idx >= 0) {
+            chosenIdx = idx
+            // 累计寻道包括中间的折返/复位移动
+            seek = 0
+            for (let sIdx = 0; sIdx <= serviceStepIdx; sIdx++) {
+              seek += trace.steps[sIdx].state["本次移动"]
+            }
+            useBackend = true
+          }
+        }
       }
-    })
-    if (bestIdx >= 0) {
-      chosenIdx = bestIdx
-    } else {
-      d.direction = -dir
+    } catch (e) {
+      // 失败静默退回到本地算法
+    }
+  }
+
+  // 2. 本地等价算法兜底（保证逻辑 100% 对齐）
+  if (!useBackend) {
+    if (algo === 'SSTF') {
       let minDist = Infinity
       d.queue.forEach((r, idx) => {
         const dist = Math.abs(r.柱面号 - d.head)
         if (dist < minDist) { minDist = dist; chosenIdx = idx }
       })
+      seek = Math.abs(d.queue[chosenIdx].柱面号 - d.head)
+    } else if (algo === 'LOOK') {
+      const dir = d.direction || 1
+      let bestIdx = -1
+      let bestDist = Infinity
+      d.queue.forEach((r, idx) => {
+        const dist = r.柱面号 - d.head
+        if ((dir > 0 && dist >= 0) || (dir < 0 && dist <= 0)) {
+          const absDist = Math.abs(dist)
+          if (absDist < bestDist) { bestDist = absDist; bestIdx = idx }
+        }
+      })
+      if (bestIdx >= 0) {
+        chosenIdx = bestIdx
+      } else {
+        d.direction = -dir
+        let minDist = Infinity
+        d.queue.forEach((r, idx) => {
+          const dist = Math.abs(r.柱面号 - d.head)
+          if (dist < minDist) { minDist = dist; chosenIdx = idx }
+        })
+      }
+      seek = Math.abs(d.queue[chosenIdx].柱面号 - d.head)
+    } else if (algo === 'SCAN') {
+      const dir = d.direction || 1
+      let bestIdx = -1
+      let bestDist = Infinity
+      d.queue.forEach((r, idx) => {
+        const dist = r.柱面号 - d.head
+        if ((dir > 0 && dist >= 0) || (dir < 0 && dist <= 0)) {
+          const absDist = Math.abs(dist)
+          if (absDist < bestDist) { bestDist = absDist; bestIdx = idx }
+        }
+      })
+      if (bestIdx >= 0) {
+        chosenIdx = bestIdx
+        seek = Math.abs(d.queue[chosenIdx].柱面号 - d.head)
+      } else {
+        // SCAN 必须移到物理端点（0 或 max_cylinder）再折返
+        d.direction = -dir
+        let minDist = Infinity
+        d.queue.forEach((r, idx) => {
+          const dist = Math.abs(r.柱面号 - d.head)
+          if (dist < minDist) { minDist = dist; chosenIdx = idx }
+        })
+        const target = d.queue[chosenIdx].柱面号
+        if (dir > 0) {
+          seek = (d.cylinders - 1 - d.head) + (d.cylinders - 1 - target)
+        } else {
+          seek = d.head + target
+        }
+      }
+    } else if (algo === 'C-LOOK') {
+      d.direction = 1 // C-LOOK 仅单向移动
+      let bestIdx = -1
+      let bestVal = Infinity
+      d.queue.forEach((r, idx) => {
+        if (r.柱面号 >= d.head && r.柱面号 < bestVal) {
+          bestVal = r.柱面号
+          bestIdx = idx
+        }
+      })
+      if (bestIdx >= 0) {
+        chosenIdx = bestIdx
+        seek = Math.abs(d.queue[chosenIdx].柱面号 - d.head)
+      } else {
+        // C-LOOK 直接返回最低请求
+        let minVal = Infinity
+        let minIdx = 0
+        d.queue.forEach((r, idx) => {
+          if (r.柱面号 < minVal) {
+            minVal = r.柱面号
+            minIdx = idx
+          }
+        })
+        chosenIdx = minIdx
+        seek = d.head - d.queue[chosenIdx].柱面号
+      }
+    } else if (algo === 'C-SCAN') {
+      d.direction = 1 // C-SCAN 仅单向移动
+      let bestIdx = -1
+      let bestVal = Infinity
+      d.queue.forEach((r, idx) => {
+        if (r.柱面号 >= d.head && r.柱面号 < bestVal) {
+          bestVal = r.柱面号
+          bestIdx = idx
+        }
+      })
+      if (bestIdx >= 0) {
+        chosenIdx = bestIdx
+        seek = Math.abs(d.queue[chosenIdx].柱面号 - d.head)
+      } else {
+        // C-SCAN 到达物理端点后，复位至 0，再移动到最低请求
+        let minVal = Infinity
+        let minIdx = 0
+        d.queue.forEach((r, idx) => {
+          if (r.柱面号 < minVal) {
+            minVal = r.柱面号
+            minIdx = idx
+          }
+        })
+        chosenIdx = minIdx
+        seek = (d.cylinders - 1 - d.head) + d.queue[chosenIdx].柱面号
+      }
+    } else {
+      // FCFS 默认
+      chosenIdx = 0
+      seek = Math.abs(d.queue[chosenIdx].柱面号 - d.head)
     }
-  } else {
-    chosenIdx = 0
   }
 
   const req = d.queue[chosenIdx]
-  const seek = Math.abs(req.柱面号 - d.head)
   const serviceTime = Math.max(2, Math.round(seek / 10) + 1)
 
   d.head = req.柱面号
-  d.direction = req.柱面号 >= d.head ? 1 : -1
+  if (algo === 'C-SCAN' || algo === 'C-LOOK') {
+    d.direction = 1
+  } else {
+    d.direction = req.柱面号 >= d.head ? 1 : -1
+  }
   d.path.push(d.head)
   if (d.path.length > 30) d.path.shift()
 
@@ -828,7 +952,7 @@ function serveDisk(os) {
 
   recordDiskBusy(os, req.进程名, serviceTime)
   os.pushEvent('设备调度', 'device', 'info',
-    `磁盘选中 ${req.进程名} 请求 (柱面 ${req.柱面号})，开始移动磁头，预计耗时 ${serviceTime} 拍`)
+    `${useBackend ? '后端' : '本地'}磁盘选中 ${req.进程名} 请求 (柱面 ${req.柱面号})，开始移动磁头，预计耗时 ${serviceTime} 拍`)
 }
 
 function makeRequest(os) {
@@ -1239,7 +1363,7 @@ async function tick(os) {
   }
 
   if (!os.disk.activeRequest && os.disk.queue.length > 0) {
-    serveDisk(os)
+    await serveDisk(os)
   }
 
   // —— 处理机调度 ——
