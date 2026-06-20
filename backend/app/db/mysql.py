@@ -9,10 +9,9 @@ import os
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "mysql+aiomysql://quados:quados@mysql:3306/quad_os?charset=utf8mb4",
-)
+# 无 DATABASE_URL（裸跑/本地）默认落地 SQLite 文件，docker 由 compose 显式注入 MySQL。
+DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///./quad_os.db"
+DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
 
 engine = create_async_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=3600)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
