@@ -1,6 +1,34 @@
 import { defineStore } from 'pinia'
 import { seedState } from '../mock/seed'
 
+// —— 实验配置持久化：跨「顶栏刷新 / 浏览器重载」保留系统设置中的参数 ——
+const CONFIG_KEY = 'quad-os:config'
+
+function loadSavedConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch (e) {
+    return null
+  }
+}
+
+export function saveConfig(config) {
+  try {
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(config))
+  } catch (e) {
+    /* localStorage 不可用时静默降级 */
+  }
+}
+
+export function clearSavedConfig() {
+  try {
+    localStorage.removeItem(CONFIG_KEY)
+  } catch (e) {
+    /* ignore */
+  }
+}
+
 /**
  * 中央 OS 运行状态 —— 全平台唯一数据源（联动接缝 + 接口契约）。
  *
@@ -9,7 +37,7 @@ import { seedState } from '../mock/seed'
  * 详见 docs/接口契约.md。
  */
 export const useOsStore = defineStore('os', {
-  state: () => seedState(),
+  state: () => seedState(loadSavedConfig() || undefined),
 
   getters: {
     runningProc: (s) => s.processes.find((p) => p.state === '运行') || null,
@@ -122,11 +150,18 @@ export const useOsStore = defineStore('os', {
       this.memory.backendMode = 'local'
       this.memory.backendError = message
     },
+    // 恢复出厂默认：清除持久化配置并按默认参数重建（系统设置「恢复默认」）
     resetState() {
+      clearSavedConfig()
       this.$state = seedState()
     },
-    // 按当前（已编辑）config 重建 memory/disk —— 系统设置「保存配置」即生效
+    // 仅重置运行态、保留当前实验配置（顶栏「刷新」按钮）
+    resetRun() {
+      this.$state = seedState(this.config)
+    },
+    // 按当前（已编辑）config 重建 memory/disk 并持久化 —— 系统设置「应用配置」即生效
     applyConfig() {
+      saveConfig(this.config)
       this.$state = seedState(this.config)
     },
   },

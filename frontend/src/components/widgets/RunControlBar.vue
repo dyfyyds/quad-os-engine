@@ -28,8 +28,8 @@
       <el-tooltip content="只推进一个时钟周期，适合观察算法过程" placement="bottom">
         <el-button size="small" :disabled="os.running" @click="driver.step()">单步</el-button>
       </el-tooltip>
-      <el-tooltip content="恢复初始状态并清空当前运行过程" placement="bottom">
-        <el-button size="small" @click="driver.reset()"><el-icon><RefreshLeft /></el-icon></el-button>
+      <el-tooltip content="重置运行过程（保留实验配置；恢复默认请到系统设置）" placement="bottom">
+        <el-button size="small" @click="driver.reset(true)"><el-icon><RefreshLeft /></el-icon></el-button>
       </el-tooltip>
     </el-button-group>
     <el-tooltip content="调整自动运行速度" placement="bottom">

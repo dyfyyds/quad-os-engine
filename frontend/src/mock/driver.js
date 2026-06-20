@@ -32,6 +32,19 @@ let schedRrQueue = []
 let schedCurrentPid = null
 let schedQuantumUsed = 0
 
+// 按当前就绪/运行集初始化 RR 轮转队列与时间片计数。
+// 在每一轮模拟的首拍（seedState 后 clock 归零，故 os.clock===1 即新一轮）统一调用，
+// 让「运行」与「单步」两条入口共用同一套初始化——否则单步模式下 schedRrQueue 始终为空，
+// 时间片到期后队列里只剩被抢占的当前进程，RR 退化为「单进程独占 CPU」。
+function seedScheduler(os) {
+  schedRrQueue = os.processes
+    .filter((p) => p.state === '就绪')
+    .sort((a, b) => (a.arrival - b.arrival) || (a.pid - b.pid))
+    .map((p) => p.pid)
+  schedCurrentPid = os.processes.find((p) => p.state === '运行')?.pid ?? null
+  schedQuantumUsed = 0
+}
+
 function clampIndex(n, len) {
   return len ? ((n % len) + len) % len : 0
 }
@@ -1202,6 +1215,9 @@ async function tick(os) {
   os.clock++
   const t = os.clock
 
+  // 首拍播种 RR 轮转队列（统一「运行 / 单步」入口；seedState 后 clock 归零保证每轮都会重播种）
+  if (t === 1) seedScheduler(os)
+
   if (os.config.processAutoArrival && t % 7 === 0) addDeterministicArrival(os, t)
 
   // —— 设备：物理寻道计时器进度 ——
@@ -1300,11 +1316,9 @@ export function useOsDriver() {
     if (os.running) return
     await Promise.all([prepareCpuTrace(os), prepareMemoryTrace(os)])
     await refreshBankerSafety(os)
-    
-    schedRrQueue = os.processes.filter(p => p.state === '就绪').map(p => p.pid)
-    schedCurrentPid = os.processes.find(p => p.state === '运行')?.pid || null
-    schedQuantumUsed = 0
-    
+
+    // 调度状态由 tick() 在首拍 seedScheduler() 统一播种；此处不再手动初始化，
+    // 以免「暂停后再运行」时把进行中的轮转队列误重置。
     os.running = true
     schedule()
   }
@@ -1319,7 +1333,7 @@ export function useOsDriver() {
     }
   }
   function setSpeed(s) { os.speed = s; if (os.running) schedule() }
-  async function reset() {
+  async function reset(keepConfig = false) {
     pause()
     cpuTrace = null
     cpuTraceKey = ''
@@ -1332,12 +1346,15 @@ export function useOsDriver() {
     memFallbackNotified = false
     bankerBusy = false
     bankerFallbackNotified = false
-    
+
     schedRrQueue = []
     schedCurrentPid = null
     schedQuantumUsed = 0
-    
-    os.resetState()
+
+    // keepConfig=true：顶栏「刷新」——保留实验配置，仅重置运行态
+    // keepConfig=false：系统设置「恢复默认」——清除持久化配置回到出厂默认
+    if (keepConfig) os.resetRun()
+    else os.resetState()
     await checkBackend()
   }
   async function checkBackend(silent = true) {
