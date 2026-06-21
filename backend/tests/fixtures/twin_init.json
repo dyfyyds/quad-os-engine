@@ -774,6 +774,15 @@
       "装入页": null,
       "装入块": null,
       "写回": false
+    },
+    "tickAccess": {
+      "clock": 0,
+      "pid": null,
+      "processName": null,
+      "performed": false,
+      "result": "idle",
+      "page": null,
+      "unit": null
     }
   },
   "resources": {

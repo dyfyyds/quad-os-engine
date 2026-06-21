@@ -323,7 +323,13 @@ export function seedState(cfg) {
     nextPid: maxPid + 1,
 
     // —— 存储核心 ——
-    memory,
+    memory: {
+      ...memory,
+      tickAccess: {
+        clock: 0, pid: null, processName: null,
+        performed: false, result: 'idle', page: null, unit: null,
+      },
+    },
 
     // —— 资源核心（银行家）——
     resources: {

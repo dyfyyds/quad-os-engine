@@ -49,3 +49,106 @@ def test_30_tick_parity_with_frontend():
         assert ed is None, f"tick {exp['tick']} 事件不一致 @ {ed}"
         sd = _first_diff(state, exp["state"], "state")
         assert sd is None, f"tick {exp['tick']} 状态不一致 @ {sd}"
+
+
+def test_page_fault_blocks_before_cpu_progress():
+    state = _load("twin_init.json")
+    running = next(p for p in state["processes"] if p["state"] == "运行")
+    running["refString"] = [0]
+    running["refPtr"] = 0
+    for row in running["pageTable"]:
+        row["标志"] = 0
+        row["主存块号"] = None
+
+    # Mulberry32(7) 的首次抽样小于 0.4，强制本拍发生访存。
+    state["rngState"] = 7
+    before_ran = running["ran"]
+
+    state, events = twin_engine.tick(state)
+
+    assert running["state"] == "阻塞"
+    assert running["pageWaitingFor"] == 0
+    assert running["ran"] == before_ran
+    assert running["faults"] == 1
+    assert state["memory"]["faults"] == 1
+    assert state["memory"]["tickAccess"] == {
+        "clock": 1, "pid": running["pid"], "processName": running["name"],
+        "performed": True, "result": "fault", "page": 0, "unit": 17,
+    }
+    assert state["gantt"] == [{"作业": "空闲", "开始": 0, "结束": 1}]
+    assert any(event["type"] == "缺页中断" for event in events)
+
+    twin_engine._load_page_after_disk_io(
+        state, {"进程名": running["name"], "page": 0, "unit": 17},
+        lambda *_: None,
+    )
+    assert running["faults"] == 1
+    assert state["memory"]["faults"] == 1
+    assert running["pageTable"][0]["标志"] == 1
+
+
+def test_tick_reports_running_process_without_memory_access():
+    state = _load("twin_init.json")
+    running = next(p for p in state["processes"] if p["state"] == "运行")
+    before = (running["refPtr"], running["hits"], running["faults"], list(state["memory"]["frames"]))
+    state["rngState"] = 1  # Mulberry32(1) 首次抽样大于 0.4。
+
+    state, events = twin_engine.tick(state)
+
+    assert running["ran"] == 1
+    assert (running["refPtr"], running["hits"], running["faults"], state["memory"]["frames"]) == before
+    assert state["memory"]["tickAccess"]["result"] == "none"
+    assert state["memory"]["tickAccess"]["processName"] == running["name"]
+    assert any(event["type"] == "未访存" for event in events)
+
+
+def test_tick_reports_memory_hit():
+    state = _load("twin_init.json")
+    running = next(p for p in state["processes"] if p["state"] == "运行")
+    resident = next(row for row in running["pageTable"] if row["标志"] == 1)
+    running["refString"] = [resident["页号"]]
+    running["refPtr"] = 0
+    state["rngState"] = 7
+
+    state, events = twin_engine.tick(state)
+
+    assert running["state"] == "运行"
+    assert running["ran"] == 1
+    assert running["hits"] == 1
+    assert state["memory"]["tickAccess"]["result"] == "hit"
+    assert state["memory"]["tickAccess"]["page"] == resident["页号"]
+    assert any(event["type"] == "访存命中" for event in events)
+
+
+@pytest.mark.parametrize("algorithm", ["LOOK", "SCAN"])
+def test_disk_direction_uses_head_position_before_move(algorithm):
+    state = _load("twin_init.json")
+    state["config"]["diskAlgo"] = algorithm
+    state["disk"]["head"] = 100
+    state["disk"]["direction"] = -1
+    state["disk"]["activeRequest"] = None
+    state["disk"]["queue"] = [{"进程名": "init", "柱面号": 40, "磁道号": 0, "物理记录号": 0}]
+
+    twin_engine._serve_disk(state, lambda *_: None)
+
+    assert state["disk"]["head"] == 40
+    assert state["disk"]["direction"] == -1
+
+
+def test_process_completion_reports_all_released_frames():
+    state = _load("twin_init.json")
+    running = next(p for p in state["processes"] if p["state"] == "运行")
+    owned = [
+        (row["主存块号"], row["页号"])
+        for row in running["pageTable"] if row["标志"] == 1
+    ]
+    assert len(owned) == 2
+    running["ran"] = running["burst"]
+
+    state, events = twin_engine.tick(state)
+
+    release = next(event for event in events if event["type"] == "内存释放")
+    assert f"统一释放 {len(owned)} 个物理页框" in release["desc"]
+    for slot, page in owned:
+        assert f"块 {slot}(页 {page})" in release["desc"]
+        assert state["memory"]["frames"][slot] is None

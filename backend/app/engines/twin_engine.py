@@ -145,6 +145,7 @@ def _apply_cpu(state, push):
                         _refresh_banker_safety(state, push, False)
 
                 new_frames = []
+                released_frames = []
                 for slot, frame_page in enumerate(state["memory"]["frames"]):
                     if frame_page is not None:
                         page_index = next(
@@ -152,6 +153,7 @@ def _apply_cpu(state, push):
                             -1,
                         )
                         if page_index >= 0:
+                            released_frames.append((slot, frame_page))
                             p["pageTable"][page_index]["标志"] = 0
                             p["pageTable"][page_index]["主存块号"] = None
                             p["pageTable"][page_index]["访问位"] = 0
@@ -160,7 +162,12 @@ def _apply_cpu(state, push):
                             continue
                     new_frames.append(frame_page)
                 state["memory"]["frames"] = new_frames
-                push("内存释放", "memory", "info", f"{p['name']} 完成，释放其占用的物理内存页框")
+                if released_frames:
+                    detail = "、".join(f"块 {slot}(页 {page})" for slot, page in released_frames)
+                    push("内存释放", "memory", "info",
+                         f"{p['name']} 完成，统一释放 {len(released_frames)} 个物理页框：{detail}")
+                else:
+                    push("内存释放", "memory", "info", f"{p['name']} 完成，当前未占用物理页框")
         elif time < p["arrival"]:
             p["state"] = "新建"
         elif p["state"] == "新建" and time >= p["arrival"]:
@@ -330,12 +337,19 @@ def _apply_memory_step(state, push):
         state["memory"]["refPtr"] = rp["refPtr"]
         state["memory"]["pageTable"] = [dict(r) for r in rp["pageTable"]]
         state["memory"]["lastReplace"] = dict(rp["lastReplace"])
+        state["memory"]["tickAccess"] = {
+            "clock": now, "pid": rp["pid"], "processName": rp["name"],
+            "performed": True, "result": "hit", "page": page, "unit": unit,
+        }
+        push("访存命中", "memory", "info",
+             f"{rp['name']} 访问 [页 {page} 单元 {unit}]，命中物理块 {slot}")
     else:
         exists = any(
             r.get("进程名") == rp["name"] and r.get("isPageFault") and r.get("page") == page
             for r in state["disk"]["queue"]
         )
         if not exists:
+            rp["faults"] += 1
             rp["state"] = "阻塞"
             rp["blockedReason"] = f"缺页中断: 等待装入页 {page}"
             rp["pageWaitingFor"] = page
@@ -357,6 +371,13 @@ def _apply_memory_step(state, push):
                 "绝对地址": None,
             }
             state["memory"]["lastReplace"] = dict(rp["lastReplace"])
+            state["memory"]["faults"] = rp["faults"]
+            state["memory"]["refPtr"] = rp["refPtr"]
+            state["memory"]["pageTable"] = [dict(r) for r in rp["pageTable"]]
+            state["memory"]["tickAccess"] = {
+                "clock": now, "pid": rp["pid"], "processName": rp["name"],
+                "performed": True, "result": "fault", "page": page, "unit": unit,
+            }
             push("缺页中断", "memory", "warning",
                  f"访问 [页 {page} 单元 {unit}] 缺页 —— 向磁盘队列发送读入请求，{rp['name']} 进入阻塞")
 
@@ -455,7 +476,6 @@ def _load_page_after_disk_io(state, req, push):
         p["pageTable"][page]["修改位"] = 0
         frames[slot] = page
 
-    p["faults"] += 1
     p["lastReplace"] = {
         "访问页": page, "单元号": unit, "缺页": True,
         "调出页": evicted, "装入页": page, "装入块": slot, "写回": wrote_back,
@@ -609,11 +629,12 @@ def _serve_disk(state, push):
     req = q[chosen_idx]
     service_time = max(2, _round(seek / 10) + 1)
 
+    old_head = d["head"]
     d["head"] = req["柱面号"]
     if algo in ("C-SCAN", "C-LOOK"):
         d["direction"] = 1
     else:
-        d["direction"] = 1 if req["柱面号"] >= d["head"] else -1
+        d["direction"] = 1 if req["柱面号"] >= old_head else -1
     d["path"].append(d["head"])
     if len(d["path"]) > 30:
         d["path"].pop(0)
@@ -982,6 +1003,22 @@ def tick(state, rng=None):
 
     running = _apply_cpu(state, push)
 
+    # 访存是本拍指令提交前的检查。缺页时指令尚未完成，不能增加 ran 或甘特图执行时间。
+    if running and running["state"] == "运行" and running["ran"] < running["burst"]:
+        state["memory"]["tickAccess"] = {
+            "clock": t, "pid": running["pid"], "processName": running["name"],
+            "performed": False, "result": "none", "page": None, "unit": None,
+        }
+        if rng.next() < 0.4:
+            _apply_memory_step(state, push)
+        else:
+            push("未访存", "memory", "info", f"{running['name']} 本拍未进行访存（40% 概率未触发）")
+    else:
+        state["memory"]["tickAccess"] = {
+            "clock": t, "pid": None, "processName": None,
+            "performed": False, "result": "idle", "page": None, "unit": None,
+        }
+
     if running and running["state"] == "运行":
         if running["ran"] < running["burst"]:
             running["ran"] = min(running["burst"], running["ran"] + 1)
@@ -1001,8 +1038,6 @@ def tick(state, rng=None):
         else:
             gantt.append({"作业": "空闲", "开始": t - 1, "结束": t})
 
-    if running and running["state"] == "运行" and running["ran"] < running["burst"] and rng.next() < 0.4:
-        _apply_memory_step(state, push)
     if running and running["state"] == "运行" and running["ran"] < running["burst"] and t % 6 == 0:
         _on_cpu_disk_request(state, running, rng, push)
     if running and running["state"] == "运行" and running["ran"] < running["burst"] and t % 5 == 0:

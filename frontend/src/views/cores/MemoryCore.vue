@@ -13,6 +13,8 @@
     </el-alert>
     <el-alert class="observe-tip" type="info" show-icon :closable="false"
       title="观察顺序：访问页号 → 是否缺页 → 页框变化 → 页表状态 → 事件日志" />
+    <el-alert class="access-notice" :type="accessNoticeType" show-icon :closable="false"
+      :title="accessNotice" />
 
     <el-row :gutter="14" style="margin-bottom: 14px;">
       <el-col :span="6"><StatCard label="缺页次数" :value="os.memory.faults" icon="Warning" color="#e64a45" /></el-col>
@@ -31,6 +33,8 @@
         </div>
       </div>
       <el-progress :percentage="os.metrics.memUtil" :stroke-width="14" :text-inside="true" style="margin-top: 14px;" />
+      <el-alert v-if="latestMemoryRelease?.ts === os.clock" class="frame-release-notice"
+        type="info" show-icon :closable="false" :title="latestMemoryRelease.desc" />
     </SectionCard>
 
     <SectionCard title="最近一次访存 · 地址转换 / 缺页置换" icon="Switch" style="margin-bottom: 14px;">
@@ -48,14 +52,16 @@
         </el-descriptions-item>
         <el-descriptions-item label="绝对地址（块号×块长+单元）">
           <span v-if="lr.访问页 === null">—</span>
-          <span v-else-if="lr.缺页" class="big out">缺页中断 *{{ lr.访问页 }} → {{ lr.绝对地址 }}</span>
+          <span v-else-if="lr.缺页" class="big out">
+            {{ lr.装入块 === null ? `缺页中断 *${lr.访问页} · 等待磁盘装入` : lr.绝对地址 }}
+          </span>
           <span v-else class="big in">{{ lr.绝对地址 }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="调出页面">
           <span class="big out">{{ swapOutText }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="装入页号">
-          <span class="big in">{{ lr.缺页 ? '页 ' + lr.装入页 : '—' }}</span>
+          <span class="big in">{{ lr.缺页 ? (lr.装入页 === null ? `等待装入页 ${lr.访问页}` : `页 ${lr.装入页}`) : '—' }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="装入主存块">
           {{ lr.装入块 === null ? '—' : '块 ' + lr.装入块 }}
@@ -111,11 +117,35 @@ const os = useOsStore()
 const autoTrack = ref(true)
 const selectedPid = ref(1)
 
-watch(() => os.runningProc, (newProc) => {
-  if (autoTrack.value && newProc) {
-    selectedPid.value = newProc.pid
+watch(() => os.memory.tickAccess?.pid, (pid) => {
+  if (autoTrack.value && pid !== null && pid !== undefined) {
+    selectedPid.value = pid
   }
 }, { immediate: true })
+
+const tickAccess = computed(() => os.memory.tickAccess || {
+  clock: os.clock, pid: null, processName: null,
+  performed: false, result: 'idle', page: null, unit: null,
+})
+const latestMemoryRelease = computed(() => os.events.find(event => event.type === '内存释放') || null)
+
+const accessNoticeType = computed(() => ({
+  hit: 'success', fault: 'error', none: 'info', idle: 'info',
+}[tickAccess.value.result] || 'info'))
+
+const accessNotice = computed(() => {
+  const access = tickAccess.value
+  const prefix = `T${access.clock}`
+  if (access.clock === 0) return 'T0 · 仿真尚未推进，暂无访存操作'
+  if (access.result === 'hit') {
+    const proc = os.processes.find(p => p.pid === access.pid)
+    const slot = proc?.pageTable?.find(row => row.页号 === access.page)?.主存块号
+    return `${prefix} · ${access.processName} 访问页 ${access.page}，命中物理块 ${slot ?? '—'}`
+  }
+  if (access.result === 'fault') return `${prefix} · ${access.processName} 访问页 ${access.page}，发生缺页中断并等待磁盘装入`
+  if (access.result === 'none') return `${prefix} · ${access.processName} 本拍未进行访存（40% 概率未触发）`
+  return `${prefix} · CPU 空闲，本拍没有进程进行访存`
+})
 
 const displayedPageTable = computed(() => {
   const proc = os.processes.find(p => p.pid === selectedPid.value)
@@ -145,6 +175,7 @@ const modeTagType = computed(() => (os.memory.backendMode === 'backend' ? 'succe
 const swapOutText = computed(() => {
   const r = lr.value
   if (!r || !r.缺页) return '—'
+  if (r.装入块 === null) return '等待磁盘装入后决定'
   return r.调出页 === null ? '无（装入空闲块）' : '页 ' + r.调出页
 })
 
@@ -171,6 +202,7 @@ function getFrameOwnerName(slot) {
 <style scoped>
 .mode-alert { margin-bottom: 14px; }
 .observe-tip { margin-bottom: 14px; }
+.access-notice { margin-bottom: 14px; font-weight: 600; }
 .frames { display: flex; flex-wrap: wrap; gap: 10px; }
 .frame { width: 90px; border: 1.5px dashed #c7d0e0; border-radius: 8px; padding: 10px; text-align: center; transition: all .25s; }
 .frame.filled { border-style: solid; border-color: var(--qos-accent); background: var(--qos-accent-soft); }
@@ -178,6 +210,7 @@ function getFrameOwnerName(slot) {
 .frame .fno { font-size: 11px; color: var(--qos-muted); }
 .frame .fpage { font-size: 15px; font-weight: 600; color: var(--qos-text); margin-top: 4px; }
 .frame .fowner { font-size: 11px; color: var(--qos-accent); margin-top: 4px; font-weight: 500; }
+.frame-release-notice { margin-top: 12px; }
 
 .big { font-size: 14px; font-weight: 700; color: var(--qos-text); }
 .big.out { color: #e64a45; }
