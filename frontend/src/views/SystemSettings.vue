@@ -229,7 +229,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onActivated, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useOsStore } from '../store/os'
@@ -243,7 +243,22 @@ const driver = useOsDriver()
 const route = useRoute()
 const router = useRouter()
 const experiments = EXPERIMENTS
-const activeExperimentId = ref('paging')
+// 默认实验：query 参数 > 上次选择(localStorage) > 上一路由对应的实验 > 'paging' 兜底。
+// 防止"我从处理机调度页过来，结果默认看到的是页面置换实验"的困惑。
+const LAST_EXP_KEY = 'quad-os:last-experiment'
+const ROUTE_TO_EXP = { '/core/processor': 'processor', '/core/memory': 'paging', '/core/device': 'disk', '/core/resource': 'banker' }
+function inferInitialExperimentId() {
+  const q = route.query.experiment
+  if (q && experimentById(q)) return q
+  try {
+    const last = localStorage.getItem(LAST_EXP_KEY)
+    if (last && experimentById(last)) return last
+  } catch (e) { /* ignore */ }
+  const backPath = router.options.history.state?.back
+  if (backPath && ROUTE_TO_EXP[backPath]) return ROUTE_TO_EXP[backPath]
+  return 'paging'
+}
+const activeExperimentId = ref(inferInitialExperimentId())
 // 全局参数面板默认展开 —— 让用户一眼看到磁盘几何 / 时钟速度这类跨实验参数。
 const advancedOpen = ref(['advanced'])
 const sched = ['FCFS', 'SJF', 'HRRN', 'PRIORITY', 'RR']
@@ -260,6 +275,7 @@ const processConfig = computed(() => os.config.processes || [])
 
 function selectExperiment(id) {
   activeExperimentId.value = id
+  try { localStorage.setItem(LAST_EXP_KEY, id) } catch (e) { /* ignore */ }
 }
 
 function addReq() {
@@ -337,6 +353,7 @@ async function reset() {
   }
   await driver.reset(false)
   activeExperimentId.value = 'paging'
+  try { localStorage.removeItem(LAST_EXP_KEY) } catch (e) { /* ignore */ }
   ElMessage.success('已恢复出厂默认并重置模拟')
 }
 
@@ -346,6 +363,11 @@ function loadFromRoute(id) {
 }
 
 onMounted(() => loadFromRoute(route.query.experiment))
+// keep-alive 下组件被复用：每次重新激活时按"路由 + 上次选择"重新推断默认实验，
+// 避免"从处理机调度页过来却看到页面置换"的困惑。
+onActivated(() => {
+  activeExperimentId.value = inferInitialExperimentId()
+})
 watch(() => route.query.experiment, loadFromRoute)
 </script>
 
