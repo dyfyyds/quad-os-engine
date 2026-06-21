@@ -187,138 +187,40 @@
         <el-collapse v-model="advancedOpen" class="advanced-panel">
           <el-collapse-item name="advanced">
             <template #title>
-              <span class="advanced-title">高级参数</span>
-              <span class="advanced-sub">影响实验结果，保存后重建模拟</span>
+              <span class="advanced-title">全局参数</span>
+              <span class="advanced-sub">以下参数对所有实验共用（不属于任何单一实验类型）</span>
             </template>
 
-            <el-row :gutter="14">
-              <el-col :xs="24" :md="12">
-                <div class="advanced-block">
-                  <h4>算法与系统参数</h4>
-                  <el-form label-width="128px" label-position="left">
-                    <el-form-item label="作业/进程调度">
-                      <el-select v-model="os.config.schedAlgo">
-                        <el-option v-for="a in sched" :key="a" :label="a" :value="a" />
-                      </el-select>
-                    </el-form-item>
-                    <el-form-item label="页面置换">
-                      <el-select v-model="os.config.pageAlgo">
-                        <el-option v-for="a in page" :key="a" :label="a" :value="a" />
-                      </el-select>
-                    </el-form-item>
-                    <el-form-item label="磁盘驱动调度">
-                      <el-select v-model="os.config.diskAlgo">
-                        <el-option v-for="a in disk" :key="a" :label="a" :value="a" />
-                      </el-select>
-                    </el-form-item>
-                    <el-form-item label="时间片大小">
-                      <el-input-number v-model="os.config.quantum" :min="1" :max="10" />
-                    </el-form-item>
-                    <el-form-item label="自动追加新作业">
-                      <el-switch
-                        v-model="os.config.processAutoArrival"
-                        active-text="开启"
-                        inactive-text="关闭"
-                      />
-                    </el-form-item>
-                    <el-form-item label="时钟速度">
-                      <el-radio-group v-model="os.config.clockSpeed">
-                        <el-radio-button v-for="s in [0.5,1,2,4]" :key="s" :value="s">{{ s }}x</el-radio-button>
-                      </el-radio-group>
-                    </el-form-item>
-                  </el-form>
-                </div>
-              </el-col>
+            <div class="advanced-block">
+              <h4>系统级参数</h4>
+              <el-form label-width="128px" label-position="left">
+                <el-form-item label="时钟速度">
+                  <el-radio-group v-model="os.config.clockSpeed">
+                    <el-radio-button v-for="s in [0.5,1,2,4]" :key="s" :value="s">{{ s }}x</el-radio-button>
+                  </el-radio-group>
+                  <p class="form-hint">控制自动运行时每拍间隔（顶栏运行控制条同样可调，两处同步）</p>
+                </el-form-item>
+              </el-form>
+            </div>
 
-              <el-col :xs="24" :md="12">
-                <div class="advanced-block">
-                  <h4>存储、资源与磁盘参数</h4>
-                  <el-form label-width="128px" label-position="left">
-                    <el-form-item label="内存块数">
-                      <el-input-number v-model="os.config.frameCount" :min="2" :max="32" />
-                    </el-form-item>
-                    <el-form-item label="块长">
-                      <el-input-number v-model="os.config.blockSize" :min="1" :max="4096" />
-                    </el-form-item>
-                    <el-form-item label="资源总量">
-                      <el-input-number v-model="os.config.resTotal" :min="1" :max="50" />
-                    </el-form-item>
-                    <el-form-item label="柱面总数">
-                      <el-input-number v-model="os.config.cylinders" :min="20" :max="500" :step="10" />
-                    </el-form-item>
-                    <el-form-item label="每柱面磁道数">
-                      <el-input-number v-model="os.config.tracksPerCyl" :min="1" :max="16" />
-                    </el-form-item>
-                    <el-form-item label="每磁道记录数">
-                      <el-input-number v-model="os.config.recordsPerTrack" :min="1" :max="32" />
-                    </el-form-item>
-                  </el-form>
-                </div>
-              </el-col>
-            </el-row>
-
-            <el-row :gutter="14" class="advanced-data">
-              <el-col :xs="24" :md="10">
-                <div class="advanced-block">
-                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                    <h4 style="margin: 0;">页面访问流</h4>
-                    <el-switch v-model="os.config.dynamicPages" size="small" active-text="动态生成" />
-                  </div>
-                  <el-input
-                    v-if="!os.config.dynamicPages"
-                    v-model="os.config.refStringText"
-                    type="textarea"
-                    :rows="4"
-                    placeholder="逗号分隔的页号序列"
-                  />
-                  <p class="hint">
-                    <el-icon><InfoFilled /></el-icon>
-                    <span v-if="os.config.dynamicPages">
-                      已启用动态模式：进程的页面序列由空间局部性（连续访问）和时间局部性（循环执行）算法动态生成。
-                    </span>
-                    <span v-else>
-                      解析后页数：{{ parsedRef.length }} · 最大页号：{{ maxPage }}
-                    </span>
-                  </p>
-                </div>
-              </el-col>
-
-              <el-col :xs="24" :md="14">
-                <div class="advanced-block">
-                  <div class="table-head">
-                    <h4>I/O 请求详细表</h4>
-                    <el-button size="small" plain @click="addReq"><el-icon><Plus /></el-icon> 添加请求</el-button>
-                  </div>
-                  <el-table :data="os.config.ioRequests" size="small" max-height="260" empty-text="暂无请求，点击添加">
-                    <el-table-column label="进程名" width="110">
-                      <template #default="{ row }">
-                        <el-input v-model="row.进程名" size="small" />
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="柱面号">
-                      <template #default="{ row }">
-                        <el-input-number v-model="row.柱面号" size="small" :min="0" :max="os.config.cylinders - 1" controls-position="right" style="width: 100%;" />
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="磁道号">
-                      <template #default="{ row }">
-                        <el-input-number v-model="row.磁道号" size="small" :min="0" :max="os.config.tracksPerCyl - 1" controls-position="right" style="width: 100%;" />
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="物理记录号">
-                      <template #default="{ row }">
-                        <el-input-number v-model="row.物理记录号" size="small" :min="0" :max="os.config.recordsPerTrack - 1" controls-position="right" style="width: 100%;" />
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="操作" width="70">
-                      <template #default="{ $index }">
-                        <el-button type="danger" link size="small" @click="removeReq($index)"><el-icon><Delete /></el-icon></el-button>
-                      </template>
-                    </el-table-column>
-                  </el-table>
-                </div>
-              </el-col>
-            </el-row>
+            <div class="advanced-block">
+              <h4>磁盘物理几何（所有 I/O 与缺页计算共用）</h4>
+              <el-form label-width="128px" label-position="left">
+                <el-form-item label="柱面总数">
+                  <el-input-number v-model="os.config.cylinders" :min="20" :max="500" :step="10" />
+                </el-form-item>
+                <el-form-item label="每柱面磁道数">
+                  <el-input-number v-model="os.config.tracksPerCyl" :min="1" :max="16" />
+                </el-form-item>
+                <el-form-item label="每磁道记录数">
+                  <el-input-number v-model="os.config.recordsPerTrack" :min="1" :max="32" />
+                </el-form-item>
+              </el-form>
+              <p class="hint">
+                <el-icon><InfoFilled /></el-icon>
+                改动后请记得点上方"应用配置"重建模拟；磁盘实验的请求柱面号会按此 clamp。
+              </p>
+            </div>
           </el-collapse-item>
         </el-collapse>
       </el-col>
@@ -342,7 +244,8 @@ const route = useRoute()
 const router = useRouter()
 const experiments = EXPERIMENTS
 const activeExperimentId = ref('paging')
-const advancedOpen = ref([])
+// 全局参数面板默认展开 —— 让用户一眼看到磁盘几何 / 时钟速度这类跨实验参数。
+const advancedOpen = ref(['advanced'])
 const sched = ['FCFS', 'SJF', 'HRRN', 'PRIORITY', 'RR']
 const page = ['FIFO', 'LRU', 'OPT', 'CLOCK']
 const disk = ['FCFS', 'SSTF', 'SCAN', 'C-SCAN', 'LOOK', 'C-LOOK']
@@ -511,6 +414,7 @@ watch(() => route.query.experiment, loadFromRoute)
 .advanced-sub { color: var(--qos-muted); font-size: 12px; }
 .advanced-block { border: 1px solid #edf2f7; border-radius: 8px; background: #fbfdff; padding: 12px; margin-bottom: 14px; }
 .advanced-block h4 { margin: 0 0 12px; font-size: 14px; color: var(--qos-text); }
+.form-hint { margin: 4px 0 0; font-size: 12px; color: var(--qos-muted); line-height: 1.45; }
 .advanced-data { margin-top: 2px; }
 .table-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .table-head h4 { margin: 0; }
