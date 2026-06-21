@@ -1,5 +1,34 @@
 import { defineStore } from 'pinia'
 import { seedState } from '../mock/seed'
+import { api } from '../api/client'
+
+// —— 实验配置持久化：跨「顶栏刷新 / 浏览器重载」保留系统设置中的参数 ——
+const CONFIG_KEY = 'quad-os:config'
+
+function loadSavedConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch (e) {
+    return null
+  }
+}
+
+export function saveConfig(config) {
+  try {
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(config))
+  } catch (e) {
+    /* localStorage 不可用时静默降级 */
+  }
+}
+
+export function clearSavedConfig() {
+  try {
+    localStorage.removeItem(CONFIG_KEY)
+  } catch (e) {
+    /* ignore */
+  }
+}
 
 /**
  * 中央 OS 运行状态 —— 全平台唯一数据源（联动接缝 + 接口契约）。
@@ -9,7 +38,7 @@ import { seedState } from '../mock/seed'
  * 详见 docs/接口契约.md。
  */
 export const useOsStore = defineStore('os', {
-  state: () => seedState(),
+  state: () => seedState(loadSavedConfig() || undefined),
 
   getters: {
     runningProc: (s) => s.processes.find((p) => p.state === '运行') || null,
@@ -122,12 +151,42 @@ export const useOsStore = defineStore('os', {
       this.memory.backendMode = 'local'
       this.memory.backendError = message
     },
+    // 恢复出厂默认：清除持久化配置并按默认参数重建（系统设置「恢复默认」）
     resetState() {
+      clearSavedConfig()
       this.$state = seedState()
     },
-    // 按当前（已编辑）config 重建 memory/disk —— 系统设置「保存配置」即生效
-    applyConfig() {
+    // 仅重置运行态、保留当前实验配置（顶栏「刷新」按钮）
+    resetRun() {
       this.$state = seedState(this.config)
+    },
+    // 系统设置「应用配置」：后端为主（先写 DB），无论成败都写本地缓存兜底，再按 config 重建。
+    async applyConfig() {
+      const cfg = this.config
+      let warn = ''
+      try {
+        await api.putConfig(cfg)
+      } catch (e) {
+        warn = e?.message || '后端不可用'
+      }
+      saveConfig(cfg)                 // 本地缓存（兜底）
+      this.$state = seedState(cfg)    // 按配置重建运行态（会重置 events）
+      if (warn) {
+        this.pushEvent('配置回退', 'system', 'warning', `配置仅保存到本地（${warn}）`)
+      }
+    },
+    // 启动时拉取后端配置；有则以后端为主覆盖本地，无/失败则保持本地。
+    async hydrateFromServer() {
+      let r
+      try {
+        r = await api.getConfig()
+      } catch (e) {
+        return                        // 后端不可用或 404 → 保持本地/默认
+      }
+      if (r && r.config) {
+        saveConfig(r.config)
+        this.$state = seedState(r.config)
+      }
     },
   },
 })

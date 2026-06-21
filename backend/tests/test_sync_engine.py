@@ -41,3 +41,17 @@ def test_trace_shape():
     t = sync_engine.run(o, buffer_size=10)
     assert t.module == "sync"
     assert len(t.steps) == len(o)
+
+
+def test_custom_process_names_role_deduction():
+    operations = [
+        {"type": "produce", "proc": "P1"},
+        {"type": "produce", "proc": "P1"},
+        {"type": "produce", "proc": "P1"},
+        {"type": "consume", "proc": "C1"},
+    ]
+    t = sync_engine.run(operations, buffer_size=2)
+    assert t.metrics["生产次数"] == 3
+    assert t.metrics["消费次数"] == 1
+    assert t.metrics["阻塞次数"] == 1
+

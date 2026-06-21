@@ -18,6 +18,20 @@ async function get(path) {
   return r.json()
 }
 
+async function put(path, body) {
+  const r = await fetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!r.ok) {
+    let detail = r.statusText
+    try { detail = (await r.json()).detail || detail } catch (e) { /* ignore */ }
+    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
+  }
+  return r.json()
+}
+
 export const api = {
   scheduling: (b) => post('/api/scheduling/run', b),
   disk: (b) => post('/api/disk/run', b),
@@ -33,4 +47,7 @@ export const api = {
   saveScenario: (b) => post('/api/scenarios', b),
   listScenarios: (m) => get('/api/scenarios?module=' + m),
   recordHistory: (b) => post('/api/history', b),
+  getConfig: () => get('/api/config'),
+  putConfig: (config) => put('/api/config', { config }),
+  twinTick: (b) => post('/api/twin/tick', b),
 }

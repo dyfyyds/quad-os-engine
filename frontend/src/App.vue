@@ -61,11 +61,14 @@
 import { ref, onMounted } from 'vue'
 import RunControlBar from './components/widgets/RunControlBar.vue'
 import { useOsDriver } from './mock/driver'
+import { useOsStore } from './store/os'
 
 const collapsed = ref(false)
 const driver = useOsDriver()
+const os = useOsStore()
 
 onMounted(async () => {
+  await os.hydrateFromServer().catch(() => {})  // 后端为主：先回填配置
   await driver.checkBackend()
 })
 </script>

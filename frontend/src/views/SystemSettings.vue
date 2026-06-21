@@ -423,7 +423,7 @@ async function startExperiment() {
   router.push(currentExperiment.value.route)
 }
 async function reset() {
-  await driver.reset()
+  await driver.reset(false)
   activeExperimentId.value = 'paging'
   ElMessage.success('已恢复默认并重置模拟')
 }

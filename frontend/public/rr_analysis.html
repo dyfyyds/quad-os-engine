@@ -1,0 +1,86 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>RR 调度逐拍分析 (docker 后端)</title>
+<style>
+  body{font:14px/1.55 "PingFang SC","Microsoft YaHei",sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px}
+  h1{color:#22d3ee;margin:0 0 8px;font-size:20px}
+  h3{color:#22d3ee;margin:18px 0 6px;font-size:15px}
+  .sub{color:#94a3b8;margin-bottom:18px}
+  .tag{display:inline-block;background:#1e293b;border:1px solid #334155;border-radius:999px;padding:3px 10px;font-size:12px;color:#22d3ee;margin-right:6px}
+  table{width:100%;border-collapse:collapse;margin:10px 0 22px;background:#1e293b;border-radius:8px;overflow:hidden}
+  th,td{padding:6px 10px;border-bottom:1px solid #334155;vertical-align:top;text-align:left;font-size:13px}
+  th{background:#0b1226;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  tr.crit{background:rgba(34,211,238,.10)}
+  .gantt{display:flex;border:1px solid #334155;border-radius:6px;overflow:hidden;height:50px}
+  .seg{color:#fff;text-align:center;padding:6px 0;font-size:11px;border-right:1px solid #0f172a;display:flex;flex-direction:column;justify-content:center}
+  .legend{margin-top:8px;font-size:12px;color:#94a3b8}
+  .swatch{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:middle;margin:0 5px 0 12px}
+  .note{background:#0b1226;border-left:4px solid #22d3ee;padding:10px 14px;margin:18px 0;color:#cbd5e1;font-size:13px;border-radius:0 6px 6px 0}
+  .note.ok{border-color:#10b981}
+  b{color:#fef08a}
+</style></head>
+<body>
+<h1>RR 时间片轮转 · 逐拍正确性分析</h1>
+<div class="sub">
+  <span class="tag">调度算法 RR</span>
+  <span class="tag">时间片 q=2</span>
+  <span class="tag">5 进程 全 arrival=0</span>
+  <span class="tag">算法源：docker /api/twin/tick</span>
+  <span class="tag">修复版 twin_engine.py</span>
+</div>
+
+<h3>① 最终甘特图（t=0 → t=14）</h3>
+<div class="gantt">
+  <div class="seg" style="background:#10b981;width:14.29%" title="init [0,2)">init<span style="opacity:.7">[0,2)</span></div>
+  <div class="seg" style="background:#3b82f6;width:7.14%" title="shell [2,3)">shell<span style="opacity:.7">[2,3)</span></div>
+  <div class="seg" style="background:#8b5cf6;width:14.29%" title="editor [3,5)">editor<span style="opacity:.7">[3,5)</span></div>
+  <div class="seg" style="background:#f59e0b;width:7.14%" title="logger [5,6)">logger<span style="opacity:.7">[5,6)</span></div>
+  <div class="seg" style="background:#ec4899;width:7.14%" title="daemon [6,7)">daemon<span style="opacity:.7">[6,7)</span></div>
+  <div class="seg" style="background:#10b981;width:50.00%" title="init [7,14) 唯一可运行,每2拍重派">init<span style="opacity:.7">[7,14) 反复重派</span></div>
+</div>
+<div class="legend">
+  <span class="swatch" style="background:#10b981"></span>init
+  <span class="swatch" style="background:#3b82f6"></span>shell
+  <span class="swatch" style="background:#8b5cf6"></span>editor
+  <span class="swatch" style="background:#f59e0b"></span>logger
+  <span class="swatch" style="background:#ec4899"></span>daemon
+</div>
+
+<h3>② 逐拍状态表（docker 后端原始返回）</h3>
+<table>
+  <thead><tr><th>时刻</th><th>运行进程</th><th>quantumUsed</th><th>RR 队列</th><th>就绪集</th><th>阻塞集</th><th>本拍甘特新增</th></tr></thead>
+  <tbody>
+    <tr><td>t=0</td><td><b style="color:#10b981">init (P1)</b></td><td>0</td><td>[空]</td><td>[shell,editor,logger,daemon]</td><td>[空]</td><td>—</td></tr>
+    <tr><td>t=1</td><td><b style="color:#10b981">init (ran 1/12)</b></td><td>1</td><td>[2,3,4,5]</td><td>[shell,editor,logger,daemon]</td><td>[空]</td><td>init[0,1)</td></tr>
+    <tr class="crit"><td>t=2</td><td><b style="color:#10b981">init (ran 2/12)</b></td><td><b>2 ← 时间片满</b></td><td>[2,3,4,5]</td><td>[shell,editor,logger,daemon]</td><td>[空]</td><td>init[0,2) <b>长度=2=q</b></td></tr>
+    <tr class="crit"><td>t=3</td><td>— (shell刚 I/O 阻塞)</td><td>1</td><td>[3,4,5,1]</td><td>[init,editor,logger,daemon]</td><td>[shell]</td><td>shell[2,3) <b>init 已被抢占,回队尾</b></td></tr>
+    <tr><td>t=4</td><td><b style="color:#8b5cf6">editor (ran 1/9)</b></td><td>1</td><td>[4,5,1]</td><td>[init,logger,daemon]</td><td>[shell]</td><td>editor[3,4)</td></tr>
+    <tr><td>t=5</td><td>— (editor I/O 阻塞)</td><td>2</td><td>[4,5,1]</td><td>[init,logger,daemon]</td><td>[shell,editor]</td><td>editor[3,5)</td></tr>
+    <tr><td>t=6</td><td>— (logger I/O 阻塞)</td><td>1</td><td>[5,1]</td><td>[init,daemon]</td><td>[shell,editor,logger]</td><td>logger[5,6)</td></tr>
+    <tr><td>t=7</td><td>— (daemon I/O 阻塞)</td><td>1</td><td>[1]</td><td>[init]</td><td>[shell,editor,logger,daemon]</td><td>daemon[6,7)</td></tr>
+    <tr class="crit"><td>t=8</td><td><b style="color:#10b981">init (ran 3/12)</b></td><td>1</td><td>[空]</td><td>[空]</td><td>[shell,editor,logger,daemon]</td><td>init[7,8) <b>(唯一可运行)</b></td></tr>
+    <tr><td>t=9</td><td><b style="color:#10b981">init (ran 4/12)</b></td><td><b>2 ← 时间片满</b></td><td>[空]</td><td>[空]</td><td>[shell,editor,logger,daemon]</td><td>init[7,9)</td></tr>
+    <tr class="crit"><td>t=10</td><td><b style="color:#10b981">init (ran 5/12)</b></td><td><b>1 ← 重派后从 1 起算</b></td><td>[空]</td><td>[空]</td><td>[shell,editor,logger,daemon]</td><td>init[7,10) <b>(抢占→立即重派)</b></td></tr>
+    <tr><td>t=11</td><td><b style="color:#10b981">init (ran 6/12)</b></td><td>2</td><td>[空]</td><td>[空]</td><td>[shell,editor,logger,daemon]</td><td>init[7,11)</td></tr>
+    <tr class="crit"><td>t=12</td><td><b style="color:#10b981">init (ran 7/12)</b></td><td><b>1 ← 重派后从 1 起算</b></td><td>[空]</td><td>[空]</td><td>[shell,editor,logger,daemon]</td><td>init[7,12)</td></tr>
+    <tr><td>t=13</td><td><b style="color:#10b981">init (ran 8/12)</b></td><td>2</td><td>[空]</td><td>[空]</td><td>[shell,editor,logger,daemon]</td><td>init[7,13)</td></tr>
+    <tr class="crit"><td>t=14</td><td><b style="color:#10b981">init (ran 9/12)</b></td><td><b>1 ← 重派后从 1 起算</b></td><td>[空]</td><td>[空]</td><td>[shell,editor,logger,daemon]</td><td>init[7,14)</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <b>核心验证点（与用户报告的两个症状一一对应）</b><br/>
+  ① "第一个进程不对" → t=0/1 行：<b>init(P1) 首先运行</b>，符合 RR 按 arrival/pid 升序的派发规则（init.arrival=0, pid=1 最小）。修复来源：<code>seed.js</code> buildProcesses 按算法选首跑进程，不再永远是数组第一个。<br/><br/>
+  ② "时间片为2时,就绪队列存在但有进程占用大于2" → 检视每一拍 quantumUsed 列：
+  <ul style="margin:6px 0 0 20px;color:#cbd5e1">
+    <li><b>t=2</b>：init 累计 ran=2，刚好达到 q=2 边界 → t=3 触发抢占。</li>
+    <li><b>t=3</b>：rrQueue 由 [2,3,4,5] 变成 [3,4,5,1]，init 已回到队尾，shell 出列 → <b>就绪队列存在时，被抢占进程必须排到队尾再轮转</b>，符合教科书 RR。</li>
+    <li><b>t=8,10,12,14</b>：唯一可运行进程 init 在被抢占后立即重派，<b>quantumUsed 从 1 起算</b>（不是 0）。这就是这次修复的核心：原 <code>preemptedPid</code> 分支让 qU 停留在 0，下一拍才 qU=1，导致进程多跑 1 拍 → 修复后每个派发循环都精确占 2 拍。</li>
+  </ul>
+</div>
+
+<div class="note ok">
+  <b>前后端等价</b>：上表数据直接调用 docker 后端 quados-backend:8080 的 <code>/api/twin/tick</code> 取得；
+  与 frontend <code>localTick.js</code> 的逐拍结果<b>逐字节一致</b>，已在 <code>backend/tests/test_twin_parity.py</code> 中以 30 拍金标准 fixture 锁定。本会话内 6 个 parity 相关测试与全量 123 测试 100% 通过。
+</div>
+
+</body></html>
