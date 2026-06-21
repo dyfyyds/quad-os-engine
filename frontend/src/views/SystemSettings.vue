@@ -180,7 +180,7 @@
             <el-button plain @click="loadExperiment(currentExperiment)"><el-icon><Download /></el-icon> 加载经典样例</el-button>
             <el-button type="primary" @click="startExperiment"><el-icon><VideoPlay /></el-icon> 开始实验并查看</el-button>
             <el-button @click="save"><el-icon><Check /></el-icon> 应用配置</el-button>
-            <el-button @click="reset"><el-icon><RefreshLeft /></el-icon> 恢复默认</el-button>
+            <el-button type="danger" plain @click="reset"><el-icon><RefreshLeft /></el-icon> 恢复出厂默认</el-button>
           </div>
         </SectionCard>
 
@@ -329,7 +329,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useOsStore } from '../store/os'
 import { useOsDriver } from '../mock/driver'
 import { EXPERIMENTS, experimentById } from '../mock/experiments'
@@ -423,9 +423,18 @@ async function startExperiment() {
   router.push(currentExperiment.value.route)
 }
 async function reset() {
+  try {
+    await ElMessageBox.confirm(
+      '将清除你修改过的进程表 / I/O 请求 / 页面访问串 / 时间片等所有自定义参数（包括本地缓存与后端持久化），并按出厂默认重建模拟。继续？',
+      '恢复出厂默认',
+      { type: 'warning', confirmButtonText: '确认清除', cancelButtonText: '取消', confirmButtonClass: 'el-button--danger' }
+    )
+  } catch (e) {
+    return  // 用户取消
+  }
   await driver.reset(false)
   activeExperimentId.value = 'paging'
-  ElMessage.success('已恢复默认并重置模拟')
+  ElMessage.success('已恢复出厂默认并重置模拟')
 }
 
 function loadFromRoute(id) {

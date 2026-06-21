@@ -38,7 +38,15 @@ export function clearSavedConfig() {
  * 详见 docs/接口契约.md。
  */
 export const useOsStore = defineStore('os', {
-  state: () => seedState(loadSavedConfig() || undefined),
+  state: () => {
+    const cached = loadSavedConfig()
+    return {
+      ...seedState(cached || undefined),
+      // configSource 表明当前 config 来自：'default'（出厂默认）/ 'local'（localStorage 缓存）
+      // / 'backend'（后端 /api/config 同步）。UI-only 字段，不进 SimState round-trip。
+      configSource: cached ? 'local' : 'default',
+    }
+  },
 
   getters: {
     runningProc: (s) => s.processes.find((p) => p.state === '运行') || null,
@@ -155,22 +163,28 @@ export const useOsStore = defineStore('os', {
     resetState() {
       clearSavedConfig()
       this.$state = seedState()
+      this.configSource = 'default'
     },
     // 仅重置运行态、保留当前实验配置（顶栏「刷新」按钮）
     resetRun() {
+      const src = this.configSource
       this.$state = seedState(this.config)
+      this.configSource = src
     },
     // 系统设置「应用配置」：后端为主（先写 DB），无论成败都写本地缓存兜底，再按 config 重建。
     async applyConfig() {
       const cfg = this.config
       let warn = ''
+      let source = 'local'
       try {
         await api.putConfig(cfg)
+        source = 'backend'
       } catch (e) {
         warn = e?.message || '后端不可用'
       }
       saveConfig(cfg)                 // 本地缓存（兜底）
       this.$state = seedState(cfg)    // 按配置重建运行态（会重置 events）
+      this.configSource = source
       if (warn) {
         this.pushEvent('配置回退', 'system', 'warning', `配置仅保存到本地（${warn}）`)
       }
@@ -186,6 +200,7 @@ export const useOsStore = defineStore('os', {
       if (r && r.config) {
         saveConfig(r.config)
         this.$state = seedState(r.config)
+        this.configSource = 'backend'
       }
     },
   },

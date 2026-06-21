@@ -11,6 +11,20 @@
     <el-tooltip :content="recentEventText" placement="bottom">
       <el-tag type="warning" effect="plain" round>最近 {{ recentEventType }}</el-tag>
     </el-tooltip>
+    <el-popover placement="bottom" :width="280" trigger="hover">
+      <template #reference>
+        <el-tag :type="configTagType" effect="plain" round>配置: {{ configSourceLabel }}</el-tag>
+      </template>
+      <div class="cfg-pop">
+        <p class="cfg-pop-title">当前实验配置来源</p>
+        <p class="cfg-pop-body">{{ configSourceDetail }}</p>
+        <ul class="cfg-pop-list">
+          <li :class="{ active: os.configSource === 'backend' }"><b>后端</b> · /api/config 同步（持久化在 MySQL）</li>
+          <li :class="{ active: os.configSource === 'local' }"><b>本地缓存</b> · 浏览器 localStorage（断网/未保存到后端时使用）</li>
+          <li :class="{ active: os.configSource === 'default' }"><b>出厂默认</b> · 代码内置常量（首次打开或恢复默认后）</li>
+        </ul>
+      </div>
+    </el-popover>
     <el-tooltip :content="backendTip" placement="bottom">
       <el-tag :type="backendTagType" effect="plain" round>{{ backendLabel }}</el-tag>
     </el-tooltip>
@@ -57,6 +71,17 @@ const recentEventText = computed(() => {
   const e = recentEvent.value
   return e ? `T${e.ts} · ${e.type} · ${e.desc}` : '尚无运行事件'
 })
+// 配置来源 tag：default→info（灰）/ local→warning（黄，提醒未同步到后端）/ backend→success（绿）。
+const CONFIG_LABEL = { default: '出厂默认', local: '本地缓存', backend: '后端' }
+const CONFIG_DETAIL = {
+  default: '尚未加载任何持久化配置；显示的是 seed.js 里的出厂常量。在【系统设置】调整后点"应用配置"才会变成"后端"或"本地"。',
+  local: '配置已存在浏览器 localStorage，但未同步到后端。可能是后端不可达时点了"应用配置"，或之前的会话残留。',
+  backend: '配置来自后端 /api/config（MySQL 持久化），多设备/会话之间一致。',
+}
+const configSourceLabel = computed(() => CONFIG_LABEL[os.configSource] || '未知')
+const configSourceDetail = computed(() => CONFIG_DETAIL[os.configSource] || '')
+const configTagType = computed(() => ({ default: 'info', local: 'warning', backend: 'success' })[os.configSource] || 'info')
+
 // fallbackCount：本会话累计的回退/恢复事件数，仅用于 tip 文案，不影响 tag 颜色。
 const fallbackCount = computed(() => os.events.filter((e) => e.type === '整拍回退' || e.type === '整拍恢复').length)
 const backendLabel = computed(() => `引擎: ${os.memory.backendMode === 'backend' ? '后端' : '本地'}`)
@@ -71,4 +96,14 @@ const backendTip = computed(() => {
 
 <style scoped>
 .run-control { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+</style>
+<style>
+.cfg-pop { font-size: 12px; line-height: 1.5; color: #475569; }
+.cfg-pop-title { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: #1a2436; }
+.cfg-pop-body { margin: 0 0 8px; color: #5b6776; }
+.cfg-pop-list { margin: 0; padding: 0; list-style: none; }
+.cfg-pop-list li { padding: 5px 8px; border-radius: 4px; color: #94a3b8; }
+.cfg-pop-list li b { color: #5b6776; margin-right: 4px; }
+.cfg-pop-list li.active { background: #effaf6; color: #1a2436; }
+.cfg-pop-list li.active b { color: #15a98a; }
 </style>
