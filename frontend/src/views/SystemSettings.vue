@@ -147,21 +147,40 @@
                   <el-option v-for="a in disk" :key="a" :label="a" :value="a" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="请求柱面序列">
-                <div class="request-cylinder-list">
-                  <el-input-number
-                    v-for="(req, index) in os.config.ioRequests"
-                    :key="index"
-                    v-model="req.柱面号"
-                    size="small"
-                    :min="0"
-                    :max="os.config.cylinders - 1"
-                    controls-position="right"
-                  />
+              <div class="process-editor">
+                <div class="table-head">
+                  <h4>I/O 请求队列</h4>
                   <el-button size="small" plain @click="addReq"><el-icon><Plus /></el-icon> 添加请求</el-button>
                 </div>
-              </el-form-item>
-              <p class="hint"><el-icon><InfoFilled /></el-icon> 初始磁头位置由模拟器固定为 53；详细 I/O 请求表可在高级参数中调整。</p>
+                <el-table :data="os.config.ioRequests" size="small" max-height="320" empty-text="暂无请求，点击添加">
+                  <el-table-column label="进程名" width="120">
+                    <template #default="{ row }">
+                      <el-input v-model="row.进程名" size="small" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="柱面号" min-width="110">
+                    <template #default="{ row }">
+                      <el-input-number v-model="row.柱面号" size="small" :min="0" :max="os.config.cylinders - 1" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="磁道号" width="110">
+                    <template #default="{ row }">
+                      <el-input-number v-model="row.磁道号" size="small" :min="0" :max="os.config.tracksPerCyl - 1" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="物理记录号" width="120">
+                    <template #default="{ row }">
+                      <el-input-number v-model="row.物理记录号" size="small" :min="0" :max="os.config.recordsPerTrack - 1" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="70">
+                    <template #default="{ $index }">
+                      <el-button type="danger" link size="small" @click="removeReq($index)"><el-icon><Delete /></el-icon></el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+              <p class="hint"><el-icon><InfoFilled /></el-icon> 初始磁头位置固定为 53；柱面/磁道/记录数上界来自【全局参数 / 磁盘物理几何】，改动后请重新应用配置。</p>
             </template>
 
             <template v-else>
