@@ -70,6 +70,7 @@ const os = useOsStore()
 onMounted(async () => {
   await os.hydrateFromServer().catch(() => {})  // 后端为主：先回填配置
   await driver.checkBackend()
+  driver.startHealthProbe()  // 10s 周期探活：用户暂停时也能感知后端切换并弹 toast
 })
 </script>
 

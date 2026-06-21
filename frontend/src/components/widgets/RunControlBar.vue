@@ -57,14 +57,15 @@ const recentEventText = computed(() => {
   const e = recentEvent.value
   return e ? `T${e.ts} · ${e.type} · ${e.desc}` : '尚无运行事件'
 })
-const fallbackCount = computed(() => os.events.filter((e) => e.type.includes('回退') || e.desc.includes('后端')).length)
-const backendLabel = computed(() => `后端 存储:${os.memory.backendMode === 'backend' ? 'backend' : 'local'}`)
-const backendTagType = computed(() => (os.memory.backendMode === 'backend' && !fallbackCount.value ? 'success' : 'warning'))
+// fallbackCount：本会话累计的回退/恢复事件数，仅用于 tip 文案，不影响 tag 颜色。
+const fallbackCount = computed(() => os.events.filter((e) => e.type === '整拍回退' || e.type === '整拍恢复').length)
+const backendLabel = computed(() => `引擎: ${os.memory.backendMode === 'backend' ? '后端' : '本地'}`)
+const backendTagType = computed(() => (os.memory.backendMode === 'backend' ? 'success' : 'warning'))
 const backendTip = computed(() => {
   const base = os.memory.backendMode === 'backend'
-    ? '存储管理正在使用后端分页引擎'
-    : '存储管理当前使用 local mock 或本地回退'
-  return fallbackCount.value ? `${base}；已有 ${fallbackCount.value} 条后端回退/连接提示` : base
+    ? '当前使用后端权威整拍引擎（/api/twin/tick）'
+    : '当前使用本地等价整拍引擎（localTick.js，与后端逐字节一致）'
+  return fallbackCount.value ? `${base}；本会话已发生 ${fallbackCount.value} 次回退/恢复` : base
 })
 </script>
 
