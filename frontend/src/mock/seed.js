@@ -73,12 +73,12 @@ export const DEFAULT_CONFIG = {
   processAutoArrival: false,
   dynamicPages: true,    // 是否启用动态页面访问流（模拟真实OS访存）
   // —— 可编辑的实验数据 ——
-  processes: [                                       // 处理机调度实验进程表
-    { pid: 1, name: 'init', arrival: 0, burst: 12, priority: 1 },
-    { pid: 2, name: 'shell', arrival: 0, burst: 6, priority: 2 },
-    { pid: 3, name: 'editor', arrival: 0, burst: 9, priority: 4 },
-    { pid: 4, name: 'logger', arrival: 0, burst: 5, priority: 2 },
-    { pid: 5, name: 'daemon', arrival: 0, burst: 7, priority: 3 },
+  processes: [                                       // 处理机调度实验进程表（pvRole: producer/consumer/'' 决定是否参与 PV 同步）
+    { pid: 1, name: 'init', arrival: 0, burst: 12, priority: 1, pvRole: '' },
+    { pid: 2, name: 'shell', arrival: 0, burst: 6, priority: 2, pvRole: 'consumer' },
+    { pid: 3, name: 'editor', arrival: 0, burst: 9, priority: 4, pvRole: '' },
+    { pid: 4, name: 'logger', arrival: 0, burst: 5, priority: 2, pvRole: 'producer' },
+    { pid: 5, name: 'daemon', arrival: 0, burst: 7, priority: 3, pvRole: 'producer' },
   ],
   refStringText: '7,0,1,2,0,3,0,4,2,3,0,3,2,1,2',  // 页面访问串（逗号分隔）
   ioRequests: [                                     // I/O 请求队列（驱动调度）
@@ -193,6 +193,20 @@ function buildDisk(config) {
   }
 }
 
+// PV 角色推断：与 localTick.js / twin_engine.py 的同名函数语义对齐，确保未显式声明
+// pvRole 的旧配置（含历史 fixture）行为不变。
+function inferPvRoleFromName(name) {
+  const n = String(name || '').toLowerCase()
+  if (n.includes('logger') || n.includes('daemon') || n.includes('producer')) return 'producer'
+  if (n.includes('shell') || n.includes('consumer')) return 'consumer'
+  return ''
+}
+
+function normalizePvRole(value, name) {
+  if (value === 'producer' || value === 'consumer' || value === '') return value
+  return inferPvRoleFromName(name)
+}
+
 function buildProcesses(config, rng) {
   const source = (config.processes && config.processes.length ? config.processes : DEFAULT_CONFIG.processes)
     .map((p, i) => ({
@@ -201,6 +215,7 @@ function buildProcesses(config, rng) {
       arrival: Math.max(0, Number(p.arrival) || 0),
       burst: Math.max(1, Number(p.burst) || 1),
       priority: Math.max(1, Number(p.priority) || 1),
+      pvRole: normalizePvRole(p.pvRole, p.name),
     }))
 
   const isDynamic = !!config.dynamicPages
@@ -273,6 +288,7 @@ export function seedState(cfg) {
     arrival: Math.max(0, Number(p.arrival) || 0),
     burst: Math.max(1, Number(p.burst) || 1),
     priority: Math.max(1, Number(p.priority) || 1),
+    pvRole: normalizePvRole(p.pvRole, p.name),
   }))
 
   const rngState0 = (config.rngSeed ?? 0x9e3779b9) >>> 0

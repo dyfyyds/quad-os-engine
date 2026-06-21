@@ -944,16 +944,25 @@ function pvConsume(s, proc, state, procObj, push) {
   }
 }
 
+// PV 角色判定：优先读 PCB 显式字段 pvRole；缺省时回落到 name 子串匹配，
+// 兼容旧 fixture / 旧配置（pvRole 未写入 PCB 的情况）。两端引擎共享同语义。
+function inferPvRoleFromName(name) {
+  const n = String(name || '').toLowerCase()
+  if (n.includes('logger') || n.includes('daemon') || n.includes('producer')) return 'producer'
+  if (n.includes('shell') || n.includes('consumer')) return 'consumer'
+  return ''
+}
+
 function isProducer(proc) {
   if (!proc) return false
-  const name = proc.name.toLowerCase()
-  return name.includes('logger') || name.includes('daemon') || name.includes('producer')
+  const role = proc.pvRole != null ? proc.pvRole : inferPvRoleFromName(proc.name)
+  return role === 'producer'
 }
 
 function isConsumer(proc) {
   if (!proc) return false
-  const name = proc.name.toLowerCase()
-  return name.includes('shell') || name.includes('consumer')
+  const role = proc.pvRole != null ? proc.pvRole : inferPvRoleFromName(proc.name)
+  return role === 'consumer'
 }
 
 function syncProduce(state, running, push) {
@@ -985,6 +994,7 @@ function addDeterministicArrival(state, t, rng, push) {
   state.processes.push({
     pid,
     name,
+    pvRole: inferPvRoleFromName(name),
     state: '就绪',
     arrival: t,
     burst: 4 + ((pid + t) % 7),

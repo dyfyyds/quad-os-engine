@@ -90,12 +90,21 @@
                       <el-input-number v-model="row.burst" size="small" :min="1" :max="99" controls-position="right" style="width: 100%;" />
                     </template>
                   </el-table-column>
-                  <el-table-column label="优先级" width="110">
+                  <el-table-column label="优先级" width="92">
                     <template #default="{ row }">
                       <el-input-number v-model="row.priority" size="small" :min="1" :max="20" controls-position="right" style="width: 100%;" />
                     </template>
                   </el-table-column>
-                  <el-table-column label="操作" width="70">
+                  <el-table-column label="PV 角色" width="118">
+                    <template #default="{ row }">
+                      <el-select v-model="row.pvRole" size="small" placeholder="不参与">
+                        <el-option label="不参与" value="" />
+                        <el-option label="生产者" value="producer" />
+                        <el-option label="消费者" value="consumer" />
+                      </el-select>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="60">
                     <template #default="{ $index }">
                       <el-button type="danger" link size="small" :disabled="processConfig.length <= 1" @click="removeProcess($index)">
                         <el-icon><Delete /></el-icon>
@@ -323,6 +332,7 @@ function addProcess() {
     arrival: 0,
     burst: 5,
     priority: 1,
+    pvRole: '',
   })
 }
 

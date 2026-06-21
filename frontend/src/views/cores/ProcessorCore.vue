@@ -84,6 +84,13 @@
               <el-progress :percentage="Math.min(100, Math.round(row.ran / row.burst * 100))" :stroke-width="10" />
             </template></el-table-column>
             <el-table-column prop="priority" label="优先级" width="72" />
+            <el-table-column label="PV 角色" width="92">
+              <template #default="{ row }">
+                <el-tag v-if="row.pvRole === 'producer'" type="success" size="small" effect="plain">生产者</el-tag>
+                <el-tag v-else-if="row.pvRole === 'consumer'" type="warning" size="small" effect="plain">消费者</el-tag>
+                <span v-else class="no-reason">—</span>
+              </template>
+            </el-table-column>
             <el-table-column label="阻塞原因" min-width="140"><template #default="{ row }">
               <span v-if="row.state === '阻塞' && row.blockedReason" class="block-reason">{{ row.blockedReason }}</span>
               <span v-else class="no-reason">—</span>

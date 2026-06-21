@@ -903,18 +903,27 @@ def _pv_consume(s, proc, state, proc_obj, push):
         proc_obj["syncPhase"] = 0
 
 
+def _infer_pv_role_from_name(name: str) -> str:
+    n = str(name or "").lower()
+    if "logger" in n or "daemon" in n or "producer" in n:
+        return "producer"
+    if "shell" in n or "consumer" in n:
+        return "consumer"
+    return ""
+
+
 def _is_producer(proc):
     if not proc:
         return False
-    name = proc["name"].lower()
-    return "logger" in name or "daemon" in name or "producer" in name
+    role = proc.get("pvRole") if proc.get("pvRole") is not None else _infer_pv_role_from_name(proc.get("name", ""))
+    return role == "producer"
 
 
 def _is_consumer(proc):
     if not proc:
         return False
-    name = proc["name"].lower()
-    return "shell" in name or "consumer" in name
+    role = proc.get("pvRole") if proc.get("pvRole") is not None else _infer_pv_role_from_name(proc.get("name", ""))
+    return role == "consumer"
 
 
 # ———————————————————————— 到达 + 指标 ————————————————————————
@@ -931,7 +940,8 @@ def _add_deterministic_arrival(state, t, rng, push):
             "外存地址": "0" + str(11 + pg).rjust(2, "0"), "loadTime": -1, "lastUsed": -1,
         })
     state["processes"].append({
-        "pid": pid, "name": name, "state": "就绪", "arrival": t,
+        "pid": pid, "name": name, "pvRole": _infer_pv_role_from_name(name),
+        "state": "就绪", "arrival": t,
         "burst": 4 + ((pid + t) % 7), "ran": 0, "priority": 1 + ((pid + t) % 4),
         "blockedReason": "", "pageWaitingFor": None, "blockedAt": None,
         "refString": ref_string, "refPtr": 0, "hits": 0, "faults": 0,
