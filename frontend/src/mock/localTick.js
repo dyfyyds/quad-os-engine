@@ -154,10 +154,12 @@ function applyCpuTrace(state, push) {
         }
 
         // 释放其持有的所有物理内存块，更新页表
+        const releasedFrames = []
         state.memory.frames = state.memory.frames.map((framePage, slot) => {
           if (framePage !== null) {
             const pageIndex = p.pageTable.findIndex((row) => row.标志 === 1 && row.主存块号 === slot)
             if (pageIndex >= 0) {
+              releasedFrames.push({ slot, page: framePage })
               p.pageTable[pageIndex].标志 = 0
               p.pageTable[pageIndex].主存块号 = null
               p.pageTable[pageIndex].访问位 = 0
@@ -167,7 +169,13 @@ function applyCpuTrace(state, push) {
           }
           return framePage
         })
-        push('内存释放', 'memory', 'info', `${p.name} 完成，释放其占用的物理内存页框`)
+        if (releasedFrames.length) {
+          const detail = releasedFrames.map(({ slot, page }) => `块 ${slot}(页 ${page})`).join('、')
+          push('内存释放', 'memory', 'info',
+            `${p.name} 完成，统一释放 ${releasedFrames.length} 个物理页框：${detail}`)
+        } else {
+          push('内存释放', 'memory', 'info', `${p.name} 完成，当前未占用物理页框`)
+        }
       }
     } else if (time < p.arrival) {
       p.state = '新建'
@@ -363,9 +371,16 @@ function applyMemoryStep(state, push) {
     state.memory.refPtr = runningProc.refPtr
     state.memory.pageTable = runningProc.pageTable.map((row) => ({ ...row }))
     state.memory.lastReplace = { ...runningProc.lastReplace }
+    state.memory.tickAccess = {
+      clock: now, pid: runningProc.pid, processName: runningProc.name,
+      performed: true, result: 'hit', page, unit,
+    }
+    push('访存命中', 'memory', 'info',
+      `${runningProc.name} 访问 [页 ${page} 单元 ${unit}]，命中物理块 ${slot}`)
   } else {
     const exists = state.disk.queue.some((r) => r.进程名 === runningProc.name && r.isPageFault && r.page === page)
     if (!exists) {
+      runningProc.faults++
       runningProc.state = '阻塞'
       runningProc.blockedReason = `缺页中断: 等待装入页 ${page}`
       runningProc.pageWaitingFor = page
@@ -389,6 +404,13 @@ function applyMemoryStep(state, push) {
         绝对地址: null,
       }
       state.memory.lastReplace = { ...runningProc.lastReplace }
+      state.memory.faults = runningProc.faults
+      state.memory.refPtr = runningProc.refPtr
+      state.memory.pageTable = runningProc.pageTable.map((row) => ({ ...row }))
+      state.memory.tickAccess = {
+        clock: now, pid: runningProc.pid, processName: runningProc.name,
+        performed: true, result: 'fault', page, unit,
+      }
 
       push('缺页中断', 'memory', 'warning',
         `访问 [页 ${page} 单元 ${unit}] 缺页 —— 向磁盘队列发送读入请求，${runningProc.name} 进入阻塞`)
@@ -489,7 +511,6 @@ function loadPageAfterDiskIo(state, req, push) {
     state.memory.frames[slot] = page
   }
 
-  p.faults++
   p.lastReplace = {
     访问页: page, 单元号: unit, 缺页: true,
     调出页: evicted, 装入页: page, 装入块: slot, 写回: wroteBack,
@@ -642,11 +663,12 @@ function serveDisk(state, push) {
   const req = d.queue[chosenIdx]
   const serviceTime = Math.max(2, Math.round(seek / 10) + 1)
 
+  const oldHead = d.head
   d.head = req.柱面号
   if (algo === 'C-SCAN' || algo === 'C-LOOK') {
     d.direction = 1
   } else {
-    d.direction = req.柱面号 >= d.head ? 1 : -1
+    d.direction = req.柱面号 >= oldHead ? 1 : -1
   }
   d.path.push(d.head)
   if (d.path.length > 30) d.path.shift()
@@ -1044,6 +1066,21 @@ export function localTick(state) {
   // —— 处理机调度 ——
   const running = applyCpuTrace(state, push)
 
+  // 访存是本拍指令提交前的检查；缺页时该指令不增加 ran，也不写入进程甘特段。
+  if (running && running.state === '运行' && running.ran < running.burst) {
+    state.memory.tickAccess = {
+      clock: t, pid: running.pid, processName: running.name,
+      performed: false, result: 'none', page: null, unit: null,
+    }
+    if (rng.next() < 0.4) applyMemoryStep(state, push)
+    else push('未访存', 'memory', 'info', `${running.name} 本拍未进行访存（40% 概率未触发）`)
+  } else {
+    state.memory.tickAccess = {
+      clock: t, pid: null, processName: null,
+      performed: false, result: 'idle', page: null, unit: null,
+    }
+  }
+
   // —— 推进执行 ran ——
   if (running && running.state === '运行') {
     if (running.ran < running.burst) {
@@ -1067,8 +1104,6 @@ export function localTick(state) {
     }
   }
 
-  // 访存（CPU → 存储）：运行进程 40% 概率访存
-  if (running && running.state === '运行' && running.ran < running.burst && rng.next() < 0.4) applyMemoryStep(state, push)
   // 磁盘 I/O（CPU → 设备）
   if (running && running.state === '运行' && running.ran < running.burst && t % 6 === 0) onCpuDiskRequest(state, running, rng, push)
   // 资源（CPU → 银行家）
