@@ -49,4 +49,5 @@ export const api = {
   recordHistory: (b) => post('/api/history', b),
   getConfig: () => get('/api/config'),
   putConfig: (config) => put('/api/config', { config }),
+  twinTick: (b) => post('/api/twin/tick', b),
 }

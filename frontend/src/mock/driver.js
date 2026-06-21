@@ -1,18 +1,11 @@
+import { ElMessage } from 'element-plus'
 import { useOsStore } from '../store/os'
-import { localTick } from './localTick'
+import { localTick, serializeSim, applySim } from './localTick'
+import { api } from '../api/client'
 
-/**
- * 驱动 —— 按虚拟时钟推进数字孪生。
- *
- * 整拍算法已抽到纯函数 localTick(state)（见 mock/localTick.js），本文件只负责：
- *   - 定时器编排（运行 / 单步 / 暂停 / 速度）
- *   - 把纯函数产出的事件并入 UI 事件流、记录历史曲线
- *   - 后端探活（backendMode）
- *
- * Task 7 将在 tick() 内加入「每拍先调后端 /api/twin/tick，断网回退本地 localTick」。
- */
 let timer = null
 let ticking = false
+let backendDown = false
 
 // 在 store 状态上推进一拍（本地纯整拍引擎），并把事件并入 UI 事件流。
 function runLocalTick(os) {
@@ -21,8 +14,34 @@ function runLocalTick(os) {
   os.recordHistory()
 }
 
-// 推进一拍。Task 7 将在此加入「后端优先 + 断网回退」。
+// 推进一拍：后端优先 + 断网回退。
+// 始终尝试后端，避免 localStorage 残留 backendMode='local' 导致永远不走后端。
 async function tick(os) {
+  try {
+    const { state, events } = await api.twinTick({ state: serializeSim(os.$state) })
+    applySim(os.$state, state)
+    for (const e of events) os.pushEvent(e.type, e.core, e.level, e.desc)
+    os.recordHistory()
+    if (backendDown) {
+      // 后端恢复：切回后端权威整拍，提示用户。
+      backendDown = false
+      os.pushEvent('整拍恢复', 'system', 'info', '后端整拍接口已恢复，切回后端权威仿真')
+      ElMessage.success('后端已恢复，已切回后端整拍仿真')
+    }
+    os.memory.backendMode = 'backend'
+    return
+  } catch (e) {
+    if (!backendDown) {
+      // 后端不可用：降级到本地等价整拍，显式提示用户（仅在状态切换时弹一次，避免每拍刷屏）。
+      backendDown = true
+      os.memory.backendMode = 'local'
+      os.pushEvent('整拍回退', 'system', 'warning', '后端整拍接口不可用，切换本地仿真')
+      ElMessage.warning({
+        message: '后端整拍接口不可用，已切换到本地等价仿真（本地与后端算法一致，结果可复现）',
+        duration: 4000,
+      })
+    }
+  }
   runLocalTick(os)
 }
 
@@ -30,7 +49,12 @@ async function tick(os) {
 async function checkBackendImpl(os) {
   try {
     const res = await fetch('/api/health')
-    os.memory.backendMode = res.ok ? 'backend' : 'local'
+    if (res.ok) {
+      os.memory.backendMode = 'backend'
+      backendDown = false
+    } else {
+      os.memory.backendMode = 'local'
+    }
   } catch (e) {
     os.memory.backendMode = 'local'
   }

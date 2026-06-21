@@ -73,13 +73,20 @@ def check_safety(available, maxm, alloc):
     )
 
 
-def _reject(reason, need, available):
+def _reject(reason, need, available, maxm, alloc):
     return SimulationTrace(
         module="banker",
         algorithm="银行家-请求",
         steps=[],
         metrics={"可分配": False, "原因": reason, "安全": False},
-        final_state={"Need": need, "Available": list(available)},
+        final_state={
+            "Available": list(available),
+            "Max": maxm,
+            "Allocation": alloc,
+            "Need": need,
+            "安全序列": [],
+            "死锁进程": [],
+        },
     )
 
 
@@ -88,9 +95,9 @@ def request(available, maxm, alloc, pid, req, use_banker=True):
     m = len(available)
 
     if not _le(req, need[pid]):
-        return _reject(f"请求 {req} 超过进程 P{pid} 的最大需求 Need={need[pid]}", need, available)
+        return _reject(f"请求 {req} 超过进程 P{pid} 的最大需求 Need={need[pid]}", need, available, maxm, alloc)
     if not _le(req, available):
-        return _reject(f"资源不足，请求 {req} > 可用 {list(available)}，进程 P{pid} 必须等待", need, available)
+        return _reject(f"资源不足，请求 {req} > 可用 {list(available)}，进程 P{pid} 必须等待", need, available, maxm, alloc)
 
     new_avail = [available[j] - req[j] for j in range(m)]
     new_alloc = [list(row) for row in alloc]

@@ -207,12 +207,29 @@ function buildProcesses(config, rng) {
   const globalRef = parseRefString(config.refStringText)
   const extAddr = (page) => '0' + String(11 + page).padStart(2, '0')
 
-  let started = false
+  // 找出所有在 t = 0 时已到达的候选进程
+  const candidates = source
+    .map((p, i) => ({ ...p, _idx: i }))
+    .filter(p => (Number(p.arrival) || 0) <= 0)
+
+  let firstRunningPid = null
+  if (candidates.length > 0) {
+    const algo = config.schedAlgo || 'FCFS'
+    let chosen = null
+    if (algo === 'SJF') {
+      chosen = candidates.sort((a, b) => (Number(a.burst) || 0) - (Number(b.burst) || 0) || a._idx - b._idx)[0]
+    } else if (algo === 'PRIORITY') {
+      chosen = candidates.sort((a, b) => (Number(a.priority) || 0) - (Number(b.priority) || 0) || a._idx - b._idx)[0]
+    } else {
+      chosen = candidates.sort((a, b) => (Number(a.arrival) || 0) - (Number(b.arrival) || 0) || a._idx - b._idx)[0]
+    }
+    if (chosen) firstRunningPid = chosen.pid
+  }
+
   return source.map((p) => {
     let state = '新建'
     if (p.arrival <= 0) {
-      state = started ? '就绪' : '运行'
-      started = true
+      state = p.pid === firstRunningPid ? '运行' : '就绪'
     }
     
     // 如果启用动态页面模式，为每个进程单独生成符合局部性原理的独立序列

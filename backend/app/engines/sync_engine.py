@@ -24,6 +24,8 @@ def run(operations, buffer_size):
     mutex_q: list[str] = []   # 阻塞在 mutex 上的进程
     lock_owner: str | None = None
 
+    process_roles: dict[str, str] = {}
+
     stat = {"produced": 0, "consumed": 0, "blocked": 0}
     steps: list[SimulationStep] = []
 
@@ -86,8 +88,12 @@ def run(operations, buffer_size):
         notes_list.append(f"互斥队列进程 {m_proc} 被唤醒并获得互斥锁")
         lock_owner = m_proc
         
-        is_prod = "producer" in m_proc.lower() or "生产者" in m_proc.lower() or "logger" in m_proc.lower() or "daemon" in m_proc.lower()
-        if is_prod:
+        role = process_roles.get(m_proc)
+        if role is None:
+            is_prod = "producer" in m_proc.lower() or "生产者" in m_proc.lower() or "logger" in m_proc.lower() or "daemon" in m_proc.lower()
+            role = "produce" if is_prod else "consume"
+            
+        if role == "produce":
             count += 1
             stat["produced"] += 1
             notes_list.append(f"生产者 {m_proc} 放入产品，缓冲区占用 {count}")
@@ -125,6 +131,7 @@ def run(operations, buffer_size):
     for idx, op in enumerate(operations):
         typ = op["type"]
         proc = op.get("proc") or (f"生产者{idx}" if typ == "produce" else f"消费者{idx}")
+        process_roles[proc] = typ
         notes: list[str] = []
 
         if typ == "produce":

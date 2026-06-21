@@ -21,7 +21,7 @@ def _key(algo, j, time):
         rr = (wait + j["burst"]) / j["burst"]
         return (-rr, j["_idx"])
     if algo == "PRIORITY":
-        pr = j["priority"] if j.get("priority") is not None else 0
+        pr = j["priority"] if j.get("priority") is not None else 99
         return (pr, j["arrival"], j["_idx"])
     raise ValueError(algo)
 
@@ -71,7 +71,10 @@ def _round_robin(jobs, q):
         time = pool[0]["arrival"]
         enqueue(time)
 
-    while queue:
+    while queue or i < len(pool):
+        if not queue:
+            time = pool[i]["arrival"]
+            enqueue(time)
         job = queue.pop(0)
         run = min(q, job["remaining"])
         start, finish = time, time + run

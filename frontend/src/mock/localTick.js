@@ -134,8 +134,10 @@ function applyCpuTrace(state, push) {
     if (p.ran >= p.burst && p.burst > 0) {
       if (p.state !== '完成') {
         p.state = '完成'
-        p.finishTime = time
-        push('进程完成', 'processor', 'info', `${p.name}(P${p.pid}) 服务时间用尽 → 完成`)
+        if (p.finishTime === undefined || p.finishTime === null) {
+          p.finishTime = time - 1
+        }
+        push('进程完成', 'processor', 'info', `${p.name}(P${p.pid}) 服务时间用尽，周转 ${p.finishTime - p.arrival}`)
 
         // 释放其持有的所有银行家算法资源
         const r = state.resources
@@ -179,6 +181,22 @@ function applyCpuTrace(state, push) {
   })
 
   // 第二轮：动态调度逻辑（时间片/抢占）
+  if (state.config.schedAlgo === 'RR') {
+    const readyPids = new Set(
+      state.processes.filter(p => p.state === '就绪').map(p => p.pid)
+    )
+    const newQueue = state.scheduler.rrQueue.filter(pid => readyPids.has(pid))
+    const missing = state.processes
+      .filter(p => p.state === '就绪' && !newQueue.includes(p.pid))
+      .sort((a, b) => (a.arrival - b.arrival) || (a.pid - b.pid))
+    for (const p of missing) {
+      newQueue.push(p.pid)
+    }
+    state.scheduler.rrQueue = newQueue
+  }
+
+  const readyProcs = state.processes.filter((p) => p.state === '就绪')
+
   const currentRunning = state.processes.find((p) => p.state === '运行')
   if (currentRunning) {
     if (currentRunning.ran >= currentRunning.burst) {
@@ -190,6 +208,34 @@ function applyCpuTrace(state, push) {
       push('进程抢占', 'processor', 'info', `${currentRunning.name} 时间片到，让出 CPU 回就绪队列`)
       sch.currentPid = null
       sch.quantumUsed = 0
+    } else if (state.config.schedAlgo === 'SJF' && readyProcs.length > 0) {
+      const sortedReady = [...readyProcs].sort(
+        (a, b) => (a.burst - a.ran) - (b.burst - b.ran) || a.arrival - b.arrival || a.pid - b.pid
+      )
+      const best = sortedReady[0]
+      const remRunning = currentRunning.burst - currentRunning.ran
+      const remBest = best.burst - best.ran
+      if (remBest < remRunning) {
+        currentRunning.state = '就绪'
+        push('进程抢占', 'processor', 'info', `发现更短就绪进程 ${best.name}(剩${remBest}拍)，${currentRunning.name}(剩${remRunning}拍) 被抢占`)
+        sch.currentPid = null
+        sch.quantumUsed = 0
+      } else {
+        sch.quantumUsed++
+      }
+    } else if (state.config.schedAlgo === 'PRIORITY' && readyProcs.length > 0) {
+      const sortedReady = [...readyProcs].sort(
+        (a, b) => a.priority - b.priority || a.arrival - b.arrival || a.pid - b.pid
+      )
+      const best = sortedReady[0]
+      if (best.priority < currentRunning.priority) {
+        currentRunning.state = '就绪'
+        push('进程抢占', 'processor', 'info', `发现更高优先级进程 ${best.name}(级${best.priority})，${currentRunning.name}(级${currentRunning.priority}) 被抢占`)
+        sch.quantumUsed = 0
+        sch.currentPid = null
+      } else {
+        sch.quantumUsed++
+      }
     } else {
       sch.quantumUsed++
     }
@@ -198,42 +244,44 @@ function applyCpuTrace(state, push) {
   // 调度核心：当前无运行进程则从就绪队列挑选
   const runningNow = state.processes.find((p) => p.state === '运行')
   if (!runningNow) {
-    const readyProcs = state.processes.filter((p) => p.state === '就绪' && !justUnblocked.has(p.name))
-    if (readyProcs.length > 0) {
+    const readyProcsDynamic = state.processes.filter((p) => p.state === '就绪')
+    if (readyProcsDynamic.length > 0) {
       let chosen = null
       const algo = state.config.schedAlgo
 
       if (algo === 'FCFS') {
-        chosen = readyProcs.sort((a, b) => a.arrival - b.arrival || a.pid - b.pid)[0]
+        chosen = readyProcsDynamic.sort((a, b) => a.arrival - b.arrival || a.pid - b.pid)[0]
       } else if (algo === 'SJF') {
-        chosen = readyProcs.sort((a, b) => (a.burst - a.ran) - (b.burst - b.ran) || a.arrival - b.arrival || a.pid - b.pid)[0]
+        chosen = readyProcsDynamic.sort((a, b) => (a.burst - a.ran) - (b.burst - b.ran) || a.arrival - b.arrival || a.pid - b.pid)[0]
       } else if (algo === 'HRRN') {
         const getRatio = (p) => {
           const wait = Math.max(0, time - p.arrival)
           const service = p.burst
           return (wait + service) / Math.max(1, service)
         }
-        chosen = readyProcs.sort((a, b) => getRatio(b) - getRatio(a) || a.pid - b.pid)[0]
+        chosen = readyProcsDynamic.sort((a, b) => getRatio(b) - getRatio(a) || a.pid - b.pid)[0]
       } else if (algo === 'PRIORITY') {
-        chosen = readyProcs.sort((a, b) => a.priority - b.priority || a.arrival - b.arrival || a.pid - b.pid)[0]
+        chosen = readyProcsDynamic.sort((a, b) => a.priority - b.priority || a.arrival - b.arrival || a.pid - b.pid)[0]
       } else if (algo === 'RR') {
         let foundPid = null
         for (const pid of sch.rrQueue) {
-          if (readyProcs.some((c) => c.pid === pid)) { foundPid = pid; break }
+          if (readyProcsDynamic.some((c) => c.pid === pid)) { foundPid = pid; break }
         }
         if (foundPid !== null) {
-          chosen = readyProcs.find((c) => c.pid === foundPid)
+          chosen = readyProcsDynamic.find((c) => c.pid === foundPid)
           sch.rrQueue = sch.rrQueue.filter((pid) => pid !== foundPid)
         } else {
-          chosen = readyProcs.sort((a, b) => a.arrival - b.arrival || a.pid - b.pid)[0]
+          chosen = readyProcsDynamic.sort((a, b) => a.arrival - b.arrival || a.pid - b.pid)[0]
         }
       } else {
-        chosen = readyProcs[0]
+        chosen = readyProcsDynamic[0]
       }
 
       if (chosen) {
         chosen.state = '运行'
         sch.currentPid = chosen.pid
+        // 每次派发都消耗当拍 1 个时间片单位（被抢占后立即重新选中也一样）：
+        // dispatch 当拍进程会 ran++，故 quantumUsed 必须从 1 起算，否则该进程多跑 1 拍。
         sch.quantumUsed = 1
         push('进程调度', 'processor', 'info', `${chosen.name}(P${chosen.pid}) 占用 CPU`)
       }
@@ -1008,8 +1056,6 @@ export function localTick(state) {
       }
       if (running.ran >= running.burst) {
         running.finishTime = t
-        running.state = '完成'
-        push('进程完成', 'processor', 'info', `${running.name}(P${running.pid}) 服务时间用尽，周转 ${t - running.arrival}`)
       }
     }
   } else {
@@ -1022,13 +1068,13 @@ export function localTick(state) {
   }
 
   // 访存（CPU → 存储）：运行进程 40% 概率访存
-  if (running && running.state === '运行' && rng.next() < 0.4) applyMemoryStep(state, push)
+  if (running && running.state === '运行' && running.ran < running.burst && rng.next() < 0.4) applyMemoryStep(state, push)
   // 磁盘 I/O（CPU → 设备）
-  if (running && running.state === '运行' && t % 6 === 0) onCpuDiskRequest(state, running, rng, push)
+  if (running && running.state === '运行' && running.ran < running.burst && t % 6 === 0) onCpuDiskRequest(state, running, rng, push)
   // 资源（CPU → 银行家）
-  if (running && running.state === '运行' && t % 5 === 0) serveBankerRequest(state, running, push)
+  if (running && running.state === '运行' && running.ran < running.burst && t % 5 === 0) serveBankerRequest(state, running, push)
   // PV 同步（CPU → 同步）
-  if (running && running.state === '运行' && t % 3 === 0) {
+  if (running && running.state === '运行' && running.ran < running.burst && t % 3 === 0) {
     if (isProducer(running)) syncProduce(state, running, push)
     else if (isConsumer(running)) syncConsume(state, running, push)
   }
