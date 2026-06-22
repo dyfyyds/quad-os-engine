@@ -41,7 +41,9 @@ export function createPipeline(container, scene, camera, { width, height }) {
   composer.setSize(width, height)
   composer.setPixelRatio(dpr)
   composer.addPass(new RenderPass(scene, camera))
-  const bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.5, 0.5, 0.85)
+  // 克制 bloom：strength 0.35 / radius 0.4 / threshold 0.92
+  // — 高 threshold 让普通 LED/环境光不参与 bloom，只把最亮的状态灯/数据包烧出光晕
+  const bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.35, 0.4, 0.92)
   composer.addPass(bloom)
   composer.addPass(new OutputPass())
 

@@ -1,9 +1,9 @@
 import * as THREE from 'three'
-import { makeLed } from './materials.js'
-import { CORE_POS } from './layout.js'
 
 /**
- * 主板舞台：写实 PCB（程序化纹理）+ 远景地面 + 内核↔四核心的铜走线 + 沿线流动的数据光点。
+ * 主板舞台：写实 PCB（程序化纹理）+ 远景地面。
+ * 总线/数据流由 bus.js 单独负责（多车道铜走线 + 桥接芯片 + 方向性数据包）。
+ *
  * buildStage(scene, materials) → { group, update(world,t,dt) }
  */
 export function buildStage(scene, materials) {
@@ -36,50 +36,8 @@ export function buildStage(scene, materials) {
   board.receiveShadow = true
   group.add(board)
 
-  // 铜走线 + 流动数据光点
-  const traces = {}
-  const scratch = new THREE.Color()
-  for (const key in CORE_POS) {
-    const [x, z] = CORE_POS[key]
-    const len = Math.hypot(x, z)
-
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.02, len), materials.copper)
-    strip.position.set(x / 2, 0.02, z / 2)
-    strip.rotation.y = Math.atan2(x, z)
-    group.add(strip)
-
-    const points = []
-    for (let i = 0; i < 2; i++) {
-      const mat = makeLed(0xffffff, 2.6)
-      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 12), mat)
-      mesh.visible = false
-      group.add(mesh)
-      points.push({ mesh, mat, t: i * 0.5 })
-    }
-    traces[key] = { x, z, strip, points }
-  }
-
-  function update(world, t, dt) {
-    if (!world) return
-    for (const c of world.cores) {
-      const tr = traces[c.key]
-      if (!tr) continue
-      scratch.set(c.color)
-      for (const pt of tr.points) {
-        if (c.active) {
-          pt.mesh.visible = true
-          pt.mat.emissive.copy(scratch)
-          pt.t = (pt.t + dt * 0.5) % 1
-          pt.mesh.position.set(
-            THREE.MathUtils.lerp(0, tr.x, pt.t),
-            0.16,
-            THREE.MathUtils.lerp(0, tr.z, pt.t),
-          )
-        } else {
-          pt.mesh.visible = false
-        }
-      }
-    }
+  function update(_world, _t, _dt) {
+    // 舞台是静态的（PCB + 地面），不需要每帧更新
   }
 
   return { group, update }

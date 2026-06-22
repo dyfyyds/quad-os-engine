@@ -18,6 +18,20 @@ export function buildMemory({ scene, materials, position }) {
   slot.receiveShadow = true
   group.add(slot)
 
+  // 插槽两端的固定卡扣（白色塑料 latch）
+  for (const sx of [-2.05, 2.05]) {
+    for (const sz of [-0.4, 0.4]) {
+      const latch = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.4, 0.18), materials.diffuser)
+      latch.position.set(sx, 0.32, sz)
+      latch.castShadow = true
+      group.add(latch)
+      // 卡扣顶部锁勾
+      const hook = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.1), materials.diffuser)
+      hook.position.set(sx, 0.55, sz)
+      group.add(hook)
+    }
+  }
+
   const rgbBars = []
   const flow = []
   for (const sz of [-0.28, 0.28]) {
@@ -41,12 +55,36 @@ export function buildMemory({ scene, materials, position }) {
     notch.position.set(0.4, 0.4, 0)
     stick.add(notch)
 
-    // 铝合金马甲（双面）
-    for (const fx of [-0.07, 0.07]) {
+    // DDR 颗粒阵列（每面 8 颗 BGA 芯片，黑色硅塑料外壳）—— 在 PCB 表面、armor 之前先放
+    for (const cz of [-0.04, 0.04]) {  // 双面
+      for (let i = 0; i < 8; i++) {
+        const chip = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.5, 0.03), materials.silicon)
+        chip.position.set(-1.45 + i * 0.42, 1.0, cz * 1.4)
+        stick.add(chip)
+        // 芯片顶部丝印标签 (反光强一点)
+        const label = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.36, 0.005), materials.labelPaper)
+        label.position.set(-1.45 + i * 0.42, 1.0, cz * 1.4 + (cz > 0 ? 0.018 : -0.018))
+        stick.add(label)
+      }
+    }
+
+    // SPD 串行存在检测芯片（单颗小芯片，PCB 右下角）
+    const spd = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.16, 0.04), materials.silicon)
+    spd.position.set(1.6, 0.5, 0.06)
+    stick.add(spd)
+
+    // 铝合金马甲（双面）—— 在芯片之上，部分露出芯片
+    for (const fx of [-0.09, 0.09]) {
       const armor = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.16, 0.04), materials.aluminum)
       armor.position.set(0, 1.02, fx)
       armor.castShadow = true
       stick.add(armor)
+      // 马甲表面横向凹槽（散热齿造型）
+      for (let k = 0; k < 6; k++) {
+        const groove = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.04, 0.014), materials.aluminumDark)
+        groove.position.set(0, 0.5 + k * 0.18, fx + (fx > 0 ? 0.022 : -0.022))
+        stick.add(groove)
+      }
     }
 
     // 顶部 RGB 导光条

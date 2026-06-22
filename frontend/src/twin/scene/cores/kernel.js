@@ -53,9 +53,37 @@ export function buildKernel(scene, materials) {
   die.castShadow = true
   group.add(die)
 
-  // 玻璃罩
-  const cover = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.42, 2.5), materials.glass)
-  cover.position.y = 0.52
+  // SoC IHS 顶盖（金属铭板，仿真 SoC 出厂封装的银色铝顶盖）
+  const ihs = new THREE.Mesh(new THREE.BoxGeometry(2.18, 0.06, 2.18), materials.bridgeIHS)
+  ihs.position.y = 0.38
+  ihs.castShadow = true
+  group.add(ihs)
+  // IHS 倒角描边（黑色细环，让顶盖与硅片分层清晰）
+  const ihsBevel = new THREE.Mesh(new THREE.BoxGeometry(2.22, 0.01, 2.22), materials.aluminumDark)
+  ihsBevel.position.y = 0.353
+  group.add(ihsBevel)
+  // 顶盖中心刻印（深色嵌入 QUAD-OS 占位铭文：用 0.04 高的暗块矩阵模拟激光雕刻）
+  const ihsLogoMat = new THREE.MeshPhysicalMaterial({ color: 0x4a525c, roughness: 0.7, metalness: 0.6 })
+  for (const [lx, lz, lw, ld] of [
+    [0, 0, 1.4, 0.18],          // 上排横长方形
+    [-0.55, 0.32, 0.3, 0.16],   // 左下
+    [0.55, 0.32, 0.3, 0.16],    // 右下
+    [0, -0.32, 0.8, 0.14],      // 底部"QUAD-OS"占位条
+  ]) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(lw, 0.005, ld), ihsLogoMat)
+    m.position.set(lx, 0.412, lz)
+    group.add(m)
+  }
+  // 四角焊接小点（金色，仿真 IHS 与基板焊死的角点）
+  for (const [cx, cz] of [[-1.05, -1.05], [1.05, -1.05], [-1.05, 1.05], [1.05, 1.05]]) {
+    const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.04, 8), materials.gold)
+    dot.position.set(cx, 0.392, cz)
+    group.add(dot)
+  }
+
+  // 玻璃罩（提高到 IHS 之上）
+  const cover = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.34, 2.5), materials.glass)
+  cover.position.y = 0.58
   group.add(cover)
 
   // 浮动标签

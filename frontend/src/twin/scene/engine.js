@@ -4,6 +4,7 @@ import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
 import { createPipeline } from './pipeline.js'
 import { createMaterials, disposeMaterials } from './materials.js'
 import { buildStage } from './stage.js'
+import { buildBus } from './bus.js'
 import { buildKernel } from './cores/kernel.js'
 import { CORE_POS } from './layout.js'
 import { buildProcessor } from './cores/processor.js'
@@ -120,6 +121,9 @@ export function createTwinScene(container) {
     const stage = buildStage(scene, materials)
     updaters.push(stage.update)
 
+    const bus = buildBus(scene, materials)
+    updaters.push(bus.update)
+
     const kernel = buildKernel(scene, materials)
     updaters.push(kernel.update)
     pickables.push({ key: 'kernel', object: kernel.group, focusPoint: new THREE.Vector3(0, 1.0, 0) })
@@ -227,10 +231,10 @@ export function createTwinScene(container) {
 
 function setupLights(scene) {
   // 环境基底（偏冷蓝，营造电子空间）
-  scene.add(new THREE.AmbientLight(0x1a2230, 0.6))
+  scene.add(new THREE.AmbientLight(0x1a2230, 0.55))
 
-  // 主光（带阴影）—— 接触阴影是立体感来源
-  const key = new THREE.DirectionalLight(0xffffff, 1.4)
+  // 主光（key light，带阴影）—— 接触阴影是立体感来源
+  const key = new THREE.DirectionalLight(0xffffff, 1.6)
   key.position.set(12, 22, 12)
   key.castShadow = true
   key.shadow.mapSize.set(2048, 2048)
@@ -243,13 +247,33 @@ function setupLights(scene) {
   key.shadow.bias = -0.0005
   scene.add(key)
 
-  // 冷调补光（勾勒金属边缘）
-  const fill = new THREE.DirectionalLight(0x88aaff, 0.4)
-  fill.position.set(-12, 8, -10)
+  // 冷调补光（fill light，勾勒金属侧面）
+  const fill = new THREE.DirectionalLight(0x88aaff, 0.55)
+  fill.position.set(-14, 10, -10)
   scene.add(fill)
 
-  // 内核点光（青绿，呼应品牌色）
-  const coreGlow = new THREE.PointLight(0x15a98a, 1.2, 24)
+  // 背光勾边（rim light，让金属边缘亮起来 — 关键的工业写实手法）
+  // 强度 0.45 / 角度更低，避免在 HDR 高反射件上烧出大面积光晕
+  const rim = new THREE.DirectionalLight(0xfff0c4, 0.45)
+  rim.position.set(0, 4, -22)
+  scene.add(rim)
+
+  // 内核点光（青绿，呼应品牌色，照亮中央 SoC + 仲裁环）
+  const coreGlow = new THREE.PointLight(0x15a98a, 1.4, 24)
   coreGlow.position.set(0, 2.2, 0)
   scene.add(coreGlow)
+
+  // 四角点光（极弱）—— 仅给每个核心提供一点彩色 fill，不参与高光
+  // 强度只 0.12，range 收紧到 5；不会让 chrome / IHS 等高反金属过曝
+  const cornerLights = [
+    [-8, 3, -8, 0x15a98a],  // processor 绿
+    [8, 3, -8, 0x3b82f6],   // memory 蓝
+    [-8, 3, 8, 0x8b5cf6],   // resource 紫
+    [8, 3, 8, 0xf0a020],    // device 橙
+  ]
+  for (const [x, y, z, c] of cornerLights) {
+    const lt = new THREE.PointLight(c, 0.12, 5)
+    lt.position.set(x, y, z)
+    scene.add(lt)
+  }
 }

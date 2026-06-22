@@ -62,3 +62,7 @@ docs/diagrams/*.svg
 
 # ==================== Project Video ====================
 project-video/
+
+# ==================== Local report-building artifacts ====================
+# 实验报告生成的临时目录（截图、模板解包、build 脚本）— 仅本地用，不入库
+.report-tmp/
