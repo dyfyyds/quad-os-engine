@@ -68,7 +68,7 @@
     </SectionCard>
 
     <SectionCard title="CPU 执行甘特图" icon="Histogram" style="margin-bottom: 14px;">
-      <GanttChart :gantt="os.gantt" />
+      <GanttChart :gantt="os.gantt" :cursor-time="os.clock" :quantum="os.config.schedAlgo === 'RR' ? os.config.quantum : 0" />
     </SectionCard>
 
     <el-row :gutter="14">
@@ -81,11 +81,20 @@
             <el-table-column prop="arrival" label="到达" width="64" />
             <el-table-column prop="burst" label="服务" width="64" />
             <el-table-column label="进度" width="140"><template #default="{ row }">
-              <el-progress :percentage="Math.min(100, Math.round(row.ran / row.burst * 100))" :stroke-width="10" />
+              <el-progress :percentage="Math.min(100, Math.round(row.ran / row.burst * 100))" :stroke-width="10" :format="() => `${row.ran}/${row.burst}`" />
             </template></el-table-column>
             <el-table-column prop="priority" label="优先级" width="72" />
-            <el-table-column label="阻塞原因" min-width="140"><template #default="{ row }">
-              <span v-if="row.state === '阻塞' && row.blockedReason" class="block-reason">{{ row.blockedReason }}</span>
+            <el-table-column label="PV 角色" width="92">
+              <template #default="{ row }">
+                <el-tag v-if="row.pvRole === 'producer'" type="success" size="small" effect="plain">生产者</el-tag>
+                <el-tag v-else-if="row.pvRole === 'consumer'" type="warning" size="small" effect="plain">消费者</el-tag>
+                <span v-else class="no-reason">—</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="阻塞原因" width="120"><template #default="{ row }">
+              <el-tooltip v-if="row.state === '阻塞' && row.blockedReason" :content="row.blockedReason" placement="top">
+                <el-tag :type="blockedTagType(row.blockedReason)" size="small" effect="plain">{{ blockedTagLabel(row.blockedReason) }}</el-tag>
+              </el-tooltip>
               <span v-else class="no-reason">—</span>
             </template></el-table-column>
           </el-table>
@@ -115,7 +124,7 @@
             </li>
           </ul>
         </SectionCard>
-        <SectionCard title="I/O 阻塞队列（设备中断 · 等待磁盘）" icon="Lock">
+        <SectionCard title="I/O 阻塞队列（设备中断 · 等待磁盘）" icon="Lock" style="margin-bottom: 14px;">
           <div v-if="!ioBlockedDetails.length" class="queue">
             <span class="empty">无 I/O 阻塞</span>
           </div>
@@ -135,6 +144,26 @@
             </li>
           </ul>
         </SectionCard>
+        <SectionCard title="PV 同步阻塞队列（信号量 / 互斥）" icon="Switch">
+          <div v-if="!pvBlockedAny" class="queue">
+            <span class="empty">无 PV 阻塞</span>
+          </div>
+          <template v-else>
+            <div v-if="os.sync.prodBlocked.length" class="pv-row">
+              <span class="pv-row-label">生产者阻塞 · 等待空闲槽 (s1)</span>
+              <el-tag v-for="n in os.sync.prodBlocked" :key="n" type="success" effect="plain" size="small">{{ n }}</el-tag>
+            </div>
+            <div v-if="os.sync.consBlocked.length" class="pv-row">
+              <span class="pv-row-label">消费者阻塞 · 等待产品 (s2)</span>
+              <el-tag v-for="n in os.sync.consBlocked" :key="n" type="warning" effect="plain" size="small">{{ n }}</el-tag>
+            </div>
+            <div v-if="os.sync.mutexBlocked.length" class="pv-row">
+              <span class="pv-row-label">互斥阻塞 · 等待临界锁 (mutex)</span>
+              <el-tag v-for="n in os.sync.mutexBlocked" :key="n" type="danger" effect="plain" size="small">{{ n }}</el-tag>
+              <span class="pv-row-owner" v-if="os.sync.lockOwner">锁持有者: <b>{{ os.sync.lockOwner }}</b></span>
+            </div>
+          </template>
+        </SectionCard>
       </el-col>
     </el-row>
   </div>
@@ -151,6 +180,24 @@ import GanttChart from '../../components/viz/GanttChart.vue'
 const os = useOsStore()
 
 const newProcs = computed(() => os.processes.filter((p) => p.state === '新建'))
+const pvBlockedAny = computed(() => (os.sync.prodBlocked?.length || 0) + (os.sync.consBlocked?.length || 0) + (os.sync.mutexBlocked?.length || 0) > 0)
+
+// 阻塞原因分类：把长长的中文 reason 字符串归一为简短 tag，悬停展开完整文案。
+function blockedTagLabel(reason) {
+  const r = String(reason || '')
+  if (r.includes('缺页')) return '缺页'
+  if (r.includes('PV互斥')) return 'PV 互斥'
+  if (r.includes('PV同步')) return 'PV 同步'
+  if (r.includes('磁盘 I/O') || r.includes('I/O')) return '磁盘 I/O'
+  return '阻塞'
+}
+function blockedTagType(reason) {
+  const r = String(reason || '')
+  if (r.includes('缺页')) return 'danger'
+  if (r.includes('PV')) return 'info'
+  if (r.includes('I/O') || r.includes('磁盘')) return 'warning'
+  return ''
+}
 
 // 缺页等待队列：state=阻塞 且 pageWaitingFor !== null —— 源于"存储中断"，等待页面装入主存
 const pageFaultDetails = computed(() => {
@@ -289,4 +336,9 @@ const ioBlockedDetails = computed(() => {
 .io-meta .page-wait { color: #e64a45; }
 .block-reason { color: #e64a45; font-size: 12px; font-weight: 500; }
 .no-reason { color: #b3bccd; }
+.pv-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 8px 4px; border-bottom: 1px dashed #eef2f7; }
+.pv-row:last-child { border-bottom: none; }
+.pv-row-label { font-size: 12px; color: var(--qos-muted); min-width: 100%; margin-bottom: 4px; }
+.pv-row-owner { font-size: 12px; color: var(--qos-muted); margin-left: 6px; }
+.pv-row-owner b { color: #15a98a; }
 </style>

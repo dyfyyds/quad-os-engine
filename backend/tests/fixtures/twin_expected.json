@@ -29,6 +29,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "运行",
           "ran": 1,
           "blockedReason": "",
@@ -157,6 +158,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -285,6 +287,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -413,6 +416,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -541,6 +545,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -1025,35 +1030,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -1106,7 +1116,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -1154,6 +1227,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "运行",
           "ran": 2,
           "blockedReason": "",
@@ -1282,6 +1356,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -1410,6 +1485,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -1538,6 +1614,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -1666,6 +1743,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -2150,35 +2228,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -2231,7 +2314,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -2278,6 +2424,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "就绪",
           "ran": 2,
           "blockedReason": "",
@@ -2406,6 +2553,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -2534,6 +2682,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -2662,6 +2811,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -2790,6 +2940,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -3291,35 +3442,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -3372,7 +3528,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -3453,6 +3672,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "就绪",
           "ran": 2,
           "blockedReason": "",
@@ -3581,6 +3801,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -3709,6 +3930,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -3839,6 +4061,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -3967,6 +4190,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -4481,35 +4705,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -4562,7 +4791,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -4623,6 +4915,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "就绪",
           "ran": 2,
           "blockedReason": "",
@@ -4751,6 +5044,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -4879,6 +5173,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -5009,6 +5304,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "运行",
           "ran": 1,
           "blockedReason": "",
@@ -5137,6 +5433,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -5669,35 +5966,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -5750,7 +6052,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -5834,6 +6199,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "就绪",
           "ran": 2,
           "blockedReason": "",
@@ -5962,6 +6328,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -6090,6 +6457,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -6220,6 +6588,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -6350,6 +6719,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 0,
           "blockedReason": "",
@@ -6894,35 +7264,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -6975,7 +7350,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -7040,6 +7478,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "就绪",
           "ran": 2,
           "blockedReason": "",
@@ -7168,6 +7607,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -7296,6 +7736,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -7426,6 +7867,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -7556,6 +7998,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "运行",
           "ran": 1,
           "blockedReason": "",
@@ -7681,6 +8124,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "就绪",
           "arrival": 7,
           "burst": 10,
@@ -8240,35 +8684,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -8321,7 +8770,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -8398,6 +8910,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "就绪",
           "ran": 2,
           "blockedReason": "",
@@ -8526,6 +9039,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -8654,6 +9168,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -8784,6 +9299,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -8914,6 +9430,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "运行",
           "ran": 2,
           "blockedReason": "",
@@ -9039,6 +9556,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "就绪",
           "arrival": 7,
           "burst": 10,
@@ -9598,35 +10116,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -9679,7 +10202,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -9749,6 +10335,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "运行",
           "ran": 3,
           "blockedReason": "",
@@ -9879,6 +10466,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -10007,6 +10595,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -10137,6 +10726,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -10267,6 +10857,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 2,
           "blockedReason": "",
@@ -10392,6 +10983,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "就绪",
           "arrival": 7,
           "burst": 10,
@@ -10967,35 +11559,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -11048,7 +11645,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -11147,6 +11807,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -11277,6 +11938,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -11405,6 +12067,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -11535,6 +12198,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -11665,6 +12329,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 2,
           "blockedReason": "",
@@ -11790,6 +12455,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "就绪",
           "arrival": 7,
           "burst": 10,
@@ -12375,35 +13041,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -12456,7 +13127,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -12535,6 +13269,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -12665,6 +13400,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -12793,6 +13529,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -12923,6 +13660,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -13053,6 +13791,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 2,
           "blockedReason": "",
@@ -13178,6 +13917,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "运行",
           "arrival": 7,
           "burst": 10,
@@ -13761,35 +14501,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -13842,7 +14587,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -13932,6 +14740,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -14062,6 +14871,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -14190,6 +15000,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -14320,6 +15131,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -14450,6 +15262,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 2,
           "blockedReason": "",
@@ -14575,6 +15388,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -15186,35 +16000,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -15267,7 +16086,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -15366,6 +16248,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -15496,6 +16379,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -15624,6 +16508,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -15754,6 +16639,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -15884,6 +16770,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "运行",
           "ran": 3,
           "blockedReason": "",
@@ -16009,6 +16896,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -16618,35 +17506,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -16699,7 +17592,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -16794,6 +17750,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -16924,6 +17881,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -17052,6 +18010,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -17182,6 +18141,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -17312,6 +18272,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "运行",
           "ran": 4,
           "blockedReason": "",
@@ -17437,6 +18398,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -17566,6 +18528,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "就绪",
           "arrival": 14,
           "burst": 4,
@@ -18196,35 +19159,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -18277,7 +19245,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -18389,6 +19420,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -18519,6 +19551,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -18647,6 +19680,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -18777,6 +19811,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -18907,6 +19942,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "就绪",
           "ran": 4,
           "blockedReason": "",
@@ -19032,6 +20068,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -19161,6 +20198,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -19805,35 +20843,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -19886,7 +20929,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -19990,6 +21096,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -20120,6 +21227,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -20248,6 +21356,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -20378,6 +21487,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -20508,6 +21618,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -20635,6 +21746,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -20764,6 +21876,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -21412,35 +22525,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -21493,7 +22611,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -21591,6 +22772,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -21721,6 +22903,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -21849,6 +23032,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -21979,6 +23163,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -22109,6 +23294,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -22236,6 +23422,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -22365,6 +23552,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -23013,35 +24201,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -23094,7 +24287,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": []
@@ -23179,6 +24435,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -23309,6 +24566,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -23437,6 +24695,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -23567,6 +24826,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -23697,6 +24957,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -23824,6 +25085,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -23953,6 +25215,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -24601,35 +25864,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -24682,7 +25950,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": []
@@ -24767,6 +26098,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -24897,6 +26229,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -25025,6 +26358,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -25155,6 +26489,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -25285,6 +26620,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -25412,6 +26748,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -25541,6 +26878,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -26189,35 +27527,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -26270,7 +27613,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": []
@@ -26355,6 +27761,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -26485,6 +27892,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -26613,6 +28021,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -26743,6 +28152,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -26873,6 +28283,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -27000,6 +28411,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -27129,6 +28541,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -27771,35 +29184,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -27852,7 +29270,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": []
@@ -27937,6 +29418,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -28067,6 +29549,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -28195,6 +29678,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -28325,6 +29809,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -28455,6 +29940,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -28582,6 +30068,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -28711,6 +30198,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -28840,6 +30328,7 @@
         {
           "pid": 8,
           "name": "sync8",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 21,
           "burst": 5,
@@ -29524,35 +31013,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -29605,7 +31099,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -29721,6 +31278,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -29851,6 +31409,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -29979,6 +31538,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -30109,6 +31669,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -30239,6 +31800,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -30366,6 +31928,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -30495,6 +32058,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -30624,6 +32188,7 @@
         {
           "pid": 8,
           "name": "sync8",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 21,
           "burst": 5,
@@ -31308,35 +32873,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -31389,7 +32959,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": []
@@ -31474,6 +33107,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -31604,6 +33238,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -31732,6 +33367,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -31862,6 +33498,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -31992,6 +33629,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -32119,6 +33757,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -32248,6 +33887,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -32377,6 +34017,7 @@
         {
           "pid": 8,
           "name": "sync8",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 21,
           "burst": 5,
@@ -33055,35 +34696,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -33136,7 +34782,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": []
@@ -33221,6 +34930,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -33351,6 +35061,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -33479,6 +35190,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -33609,6 +35321,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -33739,6 +35452,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -33866,6 +35580,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -33995,6 +35710,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -34124,6 +35840,7 @@
         {
           "pid": 8,
           "name": "sync8",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 21,
           "burst": 5,
@@ -34802,35 +36519,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -34883,7 +36605,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": []
@@ -34968,6 +36753,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -35098,6 +36884,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -35226,6 +37013,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -35356,6 +37144,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -35486,6 +37275,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -35613,6 +37403,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -35742,6 +37533,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -35871,6 +37663,7 @@
         {
           "pid": 8,
           "name": "sync8",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 21,
           "burst": 5,
@@ -36543,35 +38336,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -36624,7 +38422,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": []
@@ -36709,6 +38570,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -36839,6 +38701,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -36967,6 +38830,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -37097,6 +38961,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -37227,6 +39092,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -37354,6 +39220,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -37483,6 +39350,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -37612,6 +39480,7 @@
         {
           "pid": 8,
           "name": "sync8",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 21,
           "burst": 5,
@@ -38284,35 +40153,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -38365,7 +40239,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": []
@@ -38450,6 +40387,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -38580,6 +40518,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -38708,6 +40647,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -38838,6 +40778,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -38968,6 +40909,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -39095,6 +41037,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -39224,6 +41167,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -39353,6 +41297,7 @@
         {
           "pid": 8,
           "name": "sync8",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 21,
           "burst": 5,
@@ -40025,35 +41970,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -40106,7 +42056,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": []
@@ -40191,6 +42204,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -40321,6 +42335,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -40449,6 +42464,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -40579,6 +42595,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -40709,6 +42726,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -40836,6 +42854,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -40965,6 +42984,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -41094,6 +43114,7 @@
         {
           "pid": 8,
           "name": "sync8",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 21,
           "burst": 5,
@@ -41223,6 +43244,7 @@
         {
           "pid": 9,
           "name": "cron9",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 28,
           "burst": 6,
@@ -41920,35 +43942,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -42001,7 +44028,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": [
@@ -42105,6 +44195,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -42235,6 +44326,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -42363,6 +44455,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -42493,6 +44586,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -42623,6 +44717,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -42750,6 +44845,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -42879,6 +44975,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -43008,6 +45105,7 @@
         {
           "pid": 8,
           "name": "sync8",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 21,
           "burst": 5,
@@ -43137,6 +45235,7 @@
         {
           "pid": 9,
           "name": "cron9",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 28,
           "burst": 6,
@@ -43834,35 +45933,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -43915,7 +46019,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": []
@@ -44000,6 +46167,7 @@
           "arrival": 0,
           "burst": 12,
           "priority": 1,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 3,
           "blockedReason": "缺页中断: 等待装入页 3",
@@ -44130,6 +46298,7 @@
           "arrival": 0,
           "burst": 6,
           "priority": 2,
+          "pvRole": "consumer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "PV同步阻塞: 等待产品 (s2)",
@@ -44258,6 +46427,7 @@
           "arrival": 0,
           "burst": 9,
           "priority": 4,
+          "pvRole": "",
           "state": "阻塞",
           "ran": 0,
           "blockedReason": "缺页中断: 等待装入页 2",
@@ -44388,6 +46558,7 @@
           "arrival": 0,
           "burst": 5,
           "priority": 2,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 1,
           "blockedReason": "缺页中断: 等待装入页 0",
@@ -44518,6 +46689,7 @@
           "arrival": 0,
           "burst": 7,
           "priority": 3,
+          "pvRole": "producer",
           "state": "阻塞",
           "ran": 4,
           "blockedReason": "缺页中断: 等待装入页 1",
@@ -44645,6 +46817,7 @@
         {
           "pid": 6,
           "name": "gcc6",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 7,
           "burst": 10,
@@ -44774,6 +46947,7 @@
         {
           "pid": 7,
           "name": "vim7",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 14,
           "burst": 4,
@@ -44903,6 +47077,7 @@
         {
           "pid": 8,
           "name": "sync8",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 21,
           "burst": 5,
@@ -45032,6 +47207,7 @@
         {
           "pid": 9,
           "name": "cron9",
+          "pvRole": "",
           "state": "阻塞",
           "arrival": 28,
           "burst": 6,
@@ -45729,35 +47905,40 @@
             "name": "init",
             "arrival": 0,
             "burst": 12,
-            "priority": 1
+            "priority": 1,
+            "pvRole": ""
           },
           {
             "pid": 2,
             "name": "shell",
             "arrival": 0,
             "burst": 6,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "consumer"
           },
           {
             "pid": 3,
             "name": "editor",
             "arrival": 0,
             "burst": 9,
-            "priority": 4
+            "priority": 4,
+            "pvRole": ""
           },
           {
             "pid": 4,
             "name": "logger",
             "arrival": 0,
             "burst": 5,
-            "priority": 2
+            "priority": 2,
+            "pvRole": "producer"
           },
           {
             "pid": 5,
             "name": "daemon",
             "arrival": 0,
             "burst": 7,
-            "priority": 3
+            "priority": 3,
+            "pvRole": "producer"
           }
         ],
         "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -45810,7 +47991,70 @@
             "磁道号": 0,
             "物理记录号": 0
           }
-        ]
+        ],
+        "bankerAvailable": [
+          3,
+          3,
+          2
+        ],
+        "bankerMax": [
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            3,
+            2,
+            2
+          ],
+          [
+            9,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            4,
+            3,
+            3
+          ]
+        ],
+        "bankerAllocation": [
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            2
+          ],
+          [
+            2,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            2
+          ]
+        ],
+        "syncCapacity": 4,
+        "syncS1Init": 4,
+        "syncS2Init": 0,
+        "syncMutexInit": 1
       }
     },
     "events": []

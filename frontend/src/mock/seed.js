@@ -73,12 +73,12 @@ export const DEFAULT_CONFIG = {
   processAutoArrival: false,
   dynamicPages: true,    // 是否启用动态页面访问流（模拟真实OS访存）
   // —— 可编辑的实验数据 ——
-  processes: [                                       // 处理机调度实验进程表
-    { pid: 1, name: 'init', arrival: 0, burst: 12, priority: 1 },
-    { pid: 2, name: 'shell', arrival: 0, burst: 6, priority: 2 },
-    { pid: 3, name: 'editor', arrival: 0, burst: 9, priority: 4 },
-    { pid: 4, name: 'logger', arrival: 0, burst: 5, priority: 2 },
-    { pid: 5, name: 'daemon', arrival: 0, burst: 7, priority: 3 },
+  processes: [                                       // 处理机调度实验进程表（pvRole: producer/consumer/'' 决定是否参与 PV 同步）
+    { pid: 1, name: 'init', arrival: 0, burst: 12, priority: 1, pvRole: '' },
+    { pid: 2, name: 'shell', arrival: 0, burst: 6, priority: 2, pvRole: 'consumer' },
+    { pid: 3, name: 'editor', arrival: 0, burst: 9, priority: 4, pvRole: '' },
+    { pid: 4, name: 'logger', arrival: 0, burst: 5, priority: 2, pvRole: 'producer' },
+    { pid: 5, name: 'daemon', arrival: 0, burst: 7, priority: 3, pvRole: 'producer' },
   ],
   refStringText: '7,0,1,2,0,3,0,4,2,3,0,3,2,1,2',  // 页面访问串（逗号分隔）
   ioRequests: [                                     // I/O 请求队列（驱动调度）
@@ -91,6 +91,15 @@ export const DEFAULT_CONFIG = {
     { 进程名: '进程7', 柱面号: 65, 磁道号: 3, 物理记录号: 6 },
     { 进程名: '进程8', 柱面号: 67, 磁道号: 0, 物理记录号: 0 },
   ],
+  // 银行家实验矩阵（每行对应同名进程；多余进程在 seedState 里随机补齐）
+  bankerAvailable: [3, 3, 2],
+  bankerMax: [[7, 5, 3], [3, 2, 2], [9, 0, 2], [2, 2, 2], [4, 3, 3]],
+  bankerAllocation: [[0, 1, 0], [2, 0, 0], [3, 0, 2], [2, 1, 1], [0, 0, 2]],
+  // PV 同步实验初值（缓冲区/三个信号量）
+  syncCapacity: 4,
+  syncS1Init: 4,    // 空闲槽数（= capacity）
+  syncS2Init: 0,    // 产品数
+  syncMutexInit: 1, // 互斥锁
 }
 
 const MAX = [[7, 5, 3], [3, 2, 2], [9, 0, 2], [2, 2, 2], [4, 3, 3]]
@@ -193,6 +202,20 @@ function buildDisk(config) {
   }
 }
 
+// PV 角色推断：与 localTick.js / twin_engine.py 的同名函数语义对齐，确保未显式声明
+// pvRole 的旧配置（含历史 fixture）行为不变。
+function inferPvRoleFromName(name) {
+  const n = String(name || '').toLowerCase()
+  if (n.includes('logger') || n.includes('daemon') || n.includes('producer')) return 'producer'
+  if (n.includes('shell') || n.includes('consumer')) return 'consumer'
+  return ''
+}
+
+function normalizePvRole(value, name) {
+  if (value === 'producer' || value === 'consumer' || value === '') return value
+  return inferPvRoleFromName(name)
+}
+
 function buildProcesses(config, rng) {
   const source = (config.processes && config.processes.length ? config.processes : DEFAULT_CONFIG.processes)
     .map((p, i) => ({
@@ -201,6 +224,7 @@ function buildProcesses(config, rng) {
       arrival: Math.max(0, Number(p.arrival) || 0),
       burst: Math.max(1, Number(p.burst) || 1),
       priority: Math.max(1, Number(p.priority) || 1),
+      pvRole: normalizePvRole(p.pvRole, p.name),
     }))
 
   const isDynamic = !!config.dynamicPages
@@ -267,12 +291,26 @@ export function seedState(cfg) {
   const config = { ...DEFAULT_CONFIG, ...(cfg || {}) }
   // 深拷贝可编辑数据，避免与已 seed 的运行态共享引用
   config.ioRequests = (config.ioRequests || DEFAULT_CONFIG.ioRequests).map((r) => ({ ...r }))
+  // 银行家矩阵兼容化：旧 config (从后端/localStorage hydrate) 没有这些字段时
+  // 用 DEFAULT_CONFIG 兜底，保证 SystemSettings 直接绑定不会报错。
+  config.bankerAvailable = Array.isArray(config.bankerAvailable) && config.bankerAvailable.length === 3
+    ? [...config.bankerAvailable] : [...DEFAULT_CONFIG.bankerAvailable]
+  config.bankerMax = Array.isArray(config.bankerMax)
+    ? config.bankerMax.map(row => [...row]) : DEFAULT_CONFIG.bankerMax.map(row => [...row])
+  config.bankerAllocation = Array.isArray(config.bankerAllocation)
+    ? config.bankerAllocation.map(row => [...row]) : DEFAULT_CONFIG.bankerAllocation.map(row => [...row])
+  // PV 同步初值兼容化
+  if (config.syncCapacity == null) config.syncCapacity = DEFAULT_CONFIG.syncCapacity
+  if (config.syncS1Init == null) config.syncS1Init = DEFAULT_CONFIG.syncS1Init
+  if (config.syncS2Init == null) config.syncS2Init = DEFAULT_CONFIG.syncS2Init
+  if (config.syncMutexInit == null) config.syncMutexInit = DEFAULT_CONFIG.syncMutexInit
   config.processes = (config.processes || DEFAULT_CONFIG.processes).map((p, i) => ({
     pid: Number(p.pid) || i + 1,
     name: String(p.name || `P${i + 1}`).trim() || `P${i + 1}`,
     arrival: Math.max(0, Number(p.arrival) || 0),
     burst: Math.max(1, Number(p.burst) || 1),
     priority: Math.max(1, Number(p.priority) || 1),
+    pvRole: normalizePvRole(p.pvRole, p.name),
   }))
 
   const rngState0 = (config.rngSeed ?? 0x9e3779b9) >>> 0
@@ -292,13 +330,16 @@ export function seedState(cfg) {
   }
 
   // 动态构建资源池矩阵，长度与 processes 一致
+  // 优先用 config.bankerMax/bankerAllocation；不足以覆盖所有进程时回落到教材样例 + 随机生成。
   const numProcs = processes.length
+  const cfgMax = Array.isArray(config.bankerMax) ? config.bankerMax : MAX
+  const cfgAlloc = Array.isArray(config.bankerAllocation) ? config.bankerAllocation : ALLOC
   const maxMatrix = []
   const allocMatrix = []
   for (let i = 0; i < numProcs; i++) {
-    if (i < 5) {
-      maxMatrix.push([...MAX[i]])
-      allocMatrix.push([...ALLOC[i]])
+    if (i < cfgMax.length && i < cfgAlloc.length) {
+      maxMatrix.push([...cfgMax[i]])
+      allocMatrix.push([...cfgAlloc[i]])
     } else {
       maxMatrix.push([
         Math.floor(rng.next() * 4) + 1,
@@ -309,6 +350,8 @@ export function seedState(cfg) {
     }
   }
   const needMatrix = need(maxMatrix, allocMatrix)
+  const availVec = Array.isArray(config.bankerAvailable) && config.bankerAvailable.length === 3
+    ? [...config.bankerAvailable] : [3, 3, 2]
 
   return {
     clock: 0,
@@ -334,7 +377,7 @@ export function seedState(cfg) {
     // —— 资源核心（银行家）——
     resources: {
       types: ['R0', 'R1', 'R2'],
-      available: [3, 3, 2],
+      available: availVec,
       max: maxMatrix,
       allocation: allocMatrix,
       need: needMatrix,
@@ -342,12 +385,13 @@ export function seedState(cfg) {
       deadlock: false,
     },
 
-    // —— 进程同步（PV）—— 缓冲区容量4，s1初值4，s2初值0，互斥量mutex初值1
+    // —— 进程同步（PV）—— 初值来自 config (syncCapacity/syncS1Init/syncS2Init/syncMutexInit)，
+    // 兼容旧 fixture 在 config 未提供时回落到默认 (4 / 4 / 0 / 1)
     sync: {
-      capacity: 4,
-      s1: 4,
-      s2: 0,
-      mutex: 1,
+      capacity: Number(config.syncCapacity ?? 4),
+      s1: Number(config.syncS1Init ?? 4),
+      s2: Number(config.syncS2Init ?? 0),
+      mutex: Number(config.syncMutexInit ?? 1),
       buffer: 0,
       produced: 0,
       consumed: 0,

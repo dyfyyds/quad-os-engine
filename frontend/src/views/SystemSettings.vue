@@ -43,7 +43,12 @@
               </div>
               <p>{{ currentExperiment.target }}</p>
             </div>
-            <el-tag effect="plain">{{ currentExperiment.route }}</el-tag>
+            <div class="current-head-right">
+              <el-button link type="primary" @click="loadExperiment(currentExperiment)">
+                <el-icon><Download /></el-icon> 加载经典样例
+              </el-button>
+              <el-tag effect="plain">{{ currentExperiment.route }}</el-tag>
+            </div>
           </div>
 
           <div class="summary-grid">
@@ -90,12 +95,21 @@
                       <el-input-number v-model="row.burst" size="small" :min="1" :max="99" controls-position="right" style="width: 100%;" />
                     </template>
                   </el-table-column>
-                  <el-table-column label="优先级" width="110">
+                  <el-table-column label="优先级" width="92">
                     <template #default="{ row }">
                       <el-input-number v-model="row.priority" size="small" :min="1" :max="20" controls-position="right" style="width: 100%;" />
                     </template>
                   </el-table-column>
-                  <el-table-column label="操作" width="70">
+                  <el-table-column label="PV 角色" width="118">
+                    <template #default="{ row }">
+                      <el-select v-model="row.pvRole" size="small" placeholder="不参与">
+                        <el-option label="不参与" value="" />
+                        <el-option label="生产者" value="producer" />
+                        <el-option label="消费者" value="consumer" />
+                      </el-select>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="60">
                     <template #default="{ $index }">
                       <el-button type="danger" link size="small" :disabled="processConfig.length <= 1" @click="removeProcess($index)">
                         <el-icon><Delete /></el-icon>
@@ -147,178 +161,162 @@
                   <el-option v-for="a in disk" :key="a" :label="a" :value="a" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="请求柱面序列">
-                <div class="request-cylinder-list">
-                  <el-input-number
-                    v-for="(req, index) in os.config.ioRequests"
-                    :key="index"
-                    v-model="req.柱面号"
-                    size="small"
-                    :min="0"
-                    :max="os.config.cylinders - 1"
-                    controls-position="right"
-                  />
+              <div class="process-editor">
+                <div class="table-head">
+                  <h4>I/O 请求队列</h4>
                   <el-button size="small" plain @click="addReq"><el-icon><Plus /></el-icon> 添加请求</el-button>
                 </div>
+                <el-table :data="os.config.ioRequests" size="small" max-height="320" empty-text="暂无请求，点击添加">
+                  <el-table-column label="进程名" width="120">
+                    <template #default="{ row }">
+                      <el-input v-model="row.进程名" size="small" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="柱面号" min-width="110">
+                    <template #default="{ row }">
+                      <el-input-number v-model="row.柱面号" size="small" :min="0" :max="os.config.cylinders - 1" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="磁道号" width="110">
+                    <template #default="{ row }">
+                      <el-input-number v-model="row.磁道号" size="small" :min="0" :max="os.config.tracksPerCyl - 1" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="物理记录号" width="120">
+                    <template #default="{ row }">
+                      <el-input-number v-model="row.物理记录号" size="small" :min="0" :max="os.config.recordsPerTrack - 1" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="70">
+                    <template #default="{ $index }">
+                      <el-button type="danger" link size="small" @click="removeReq($index)"><el-icon><Delete /></el-icon></el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+              <p class="hint"><el-icon><InfoFilled /></el-icon> 初始磁头位置固定为 53；柱面/磁道/记录数上界来自【全局参数 / 磁盘物理几何】，改动后请重新应用配置。</p>
+            </template>
+
+            <template v-else-if="activeExperimentId === 'sync'">
+              <el-form-item label="缓冲区容量">
+                <el-input-number v-model="os.config.syncCapacity" :min="1" :max="20" />
+                <p class="form-hint">生产者-消费者共享缓冲区可放置的产品上限</p>
               </el-form-item>
-              <p class="hint"><el-icon><InfoFilled /></el-icon> 初始磁头位置由模拟器固定为 53；详细 I/O 请求表可在高级参数中调整。</p>
+              <el-form-item label="s1 初值（空闲槽）">
+                <el-input-number v-model="os.config.syncS1Init" :min="0" :max="20" />
+                <p class="form-hint">通常 = 缓冲区容量；生产者 P(s1) 时递减</p>
+              </el-form-item>
+              <el-form-item label="s2 初值（产品数）">
+                <el-input-number v-model="os.config.syncS2Init" :min="0" :max="20" />
+                <p class="form-hint">通常 = 0；消费者 P(s2) 时递减</p>
+              </el-form-item>
+              <el-form-item label="mutex 初值（互斥）">
+                <el-input-number v-model="os.config.syncMutexInit" :min="0" :max="5" />
+                <p class="form-hint">通常 = 1；进入临界区前 P(mutex)，退出时 V(mutex)</p>
+              </el-form-item>
+              <p class="hint">
+                <el-icon><InfoFilled /></el-icon>
+                哪些进程参与 PV 同步？在「处理机调度实验」的进程表里设置 PV 角色为"生产者/消费者"。当前
+                <b>{{ pvProducerCount }}</b> 个生产者 + <b>{{ pvConsumerCount }}</b> 个消费者。
+              </p>
             </template>
 
             <template v-else>
-              <el-form-item label="资源总量">
-                <el-input-number v-model="os.config.resTotal" :min="1" :max="50" />
+              <el-form-item label="可用资源 Available">
+                <div class="banker-vec">
+                  <el-input-number v-for="(_, j) in 3" :key="j" v-model="os.config.bankerAvailable[j]" :min="0" :max="20" size="small" controls-position="right" />
+                </div>
+                <p class="form-hint">三种资源 R0 / R1 / R2 的初始可用量</p>
               </el-form-item>
-              <div class="matrix-note">
-                <div><span>Available</span><b>[3, 3, 2]</b></div>
-                <div><span>资源矩阵</span><b>使用默认 Max / Allocation 教材样例</b></div>
-                <div><span>预期结果</span><b>可观察安全序列；不满足条件时出现告警。</b></div>
+              <div class="process-editor">
+                <div class="table-head">
+                  <h4>资源矩阵 · Max / Allocation （Need = Max - Alloc，自动计算）</h4>
+                </div>
+                <el-table :data="bankerRows" size="small" :show-summary="false" empty-text="无进程">
+                  <el-table-column label="进程" width="92">
+                    <template #default="{ row }">{{ row.name }}</template>
+                  </el-table-column>
+                  <el-table-column label="Max R0" width="90">
+                    <template #default="{ $index }">
+                      <el-input-number v-model="os.config.bankerMax[$index][0]" :min="0" :max="20" size="small" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="Max R1" width="90">
+                    <template #default="{ $index }">
+                      <el-input-number v-model="os.config.bankerMax[$index][1]" :min="0" :max="20" size="small" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="Max R2" width="90">
+                    <template #default="{ $index }">
+                      <el-input-number v-model="os.config.bankerMax[$index][2]" :min="0" :max="20" size="small" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="Alloc R0" width="92">
+                    <template #default="{ $index }">
+                      <el-input-number v-model="os.config.bankerAllocation[$index][0]" :min="0" :max="os.config.bankerMax[$index][0] || 0" size="small" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="Alloc R1" width="92">
+                    <template #default="{ $index }">
+                      <el-input-number v-model="os.config.bankerAllocation[$index][1]" :min="0" :max="os.config.bankerMax[$index][1] || 0" size="small" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="Alloc R2" width="92">
+                    <template #default="{ $index }">
+                      <el-input-number v-model="os.config.bankerAllocation[$index][2]" :min="0" :max="os.config.bankerMax[$index][2] || 0" size="small" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                </el-table>
               </div>
+              <p class="hint"><el-icon><InfoFilled /></el-icon> 行数 = 进程表里的进程数；改进程表后请重新"应用配置"使矩阵重新对齐。Allocation 上界自动 clamp 到对应 Max 值。</p>
             </template>
           </el-form>
 
           <div class="action-bar">
-            <el-button plain @click="loadExperiment(currentExperiment)"><el-icon><Download /></el-icon> 加载经典样例</el-button>
-            <el-button type="primary" @click="startExperiment"><el-icon><VideoPlay /></el-icon> 开始实验并查看</el-button>
+            <el-button type="danger" plain @click="reset"><el-icon><RefreshLeft /></el-icon> 恢复出厂默认</el-button>
+            <span class="action-spacer" />
             <el-button @click="save"><el-icon><Check /></el-icon> 应用配置</el-button>
-            <el-button @click="reset"><el-icon><RefreshLeft /></el-icon> 恢复默认</el-button>
+            <el-button type="primary" @click="startExperiment"><el-icon><VideoPlay /></el-icon> 应用并跳转</el-button>
           </div>
         </SectionCard>
 
         <el-collapse v-model="advancedOpen" class="advanced-panel">
           <el-collapse-item name="advanced">
             <template #title>
-              <span class="advanced-title">高级参数</span>
-              <span class="advanced-sub">影响实验结果，保存后重建模拟</span>
+              <span class="advanced-title">全局参数</span>
+              <span class="advanced-sub">以下参数对所有实验共用（不属于任何单一实验类型）</span>
             </template>
 
-            <el-row :gutter="14">
-              <el-col :xs="24" :md="12">
-                <div class="advanced-block">
-                  <h4>算法与系统参数</h4>
-                  <el-form label-width="128px" label-position="left">
-                    <el-form-item label="作业/进程调度">
-                      <el-select v-model="os.config.schedAlgo">
-                        <el-option v-for="a in sched" :key="a" :label="a" :value="a" />
-                      </el-select>
-                    </el-form-item>
-                    <el-form-item label="页面置换">
-                      <el-select v-model="os.config.pageAlgo">
-                        <el-option v-for="a in page" :key="a" :label="a" :value="a" />
-                      </el-select>
-                    </el-form-item>
-                    <el-form-item label="磁盘驱动调度">
-                      <el-select v-model="os.config.diskAlgo">
-                        <el-option v-for="a in disk" :key="a" :label="a" :value="a" />
-                      </el-select>
-                    </el-form-item>
-                    <el-form-item label="时间片大小">
-                      <el-input-number v-model="os.config.quantum" :min="1" :max="10" />
-                    </el-form-item>
-                    <el-form-item label="自动追加新作业">
-                      <el-switch
-                        v-model="os.config.processAutoArrival"
-                        active-text="开启"
-                        inactive-text="关闭"
-                      />
-                    </el-form-item>
-                    <el-form-item label="时钟速度">
-                      <el-radio-group v-model="os.config.clockSpeed">
-                        <el-radio-button v-for="s in [0.5,1,2,4]" :key="s" :value="s">{{ s }}x</el-radio-button>
-                      </el-radio-group>
-                    </el-form-item>
-                  </el-form>
-                </div>
-              </el-col>
+            <div class="advanced-block">
+              <h4>系统级参数</h4>
+              <el-form label-width="128px" label-position="left">
+                <el-form-item label="时钟速度">
+                  <el-radio-group v-model="os.config.clockSpeed">
+                    <el-radio-button v-for="s in [0.5,1,2,4]" :key="s" :value="s">{{ s }}x</el-radio-button>
+                  </el-radio-group>
+                  <p class="form-hint">控制自动运行时每拍间隔（顶栏运行控制条同样可调，两处同步）</p>
+                </el-form-item>
+              </el-form>
+            </div>
 
-              <el-col :xs="24" :md="12">
-                <div class="advanced-block">
-                  <h4>存储、资源与磁盘参数</h4>
-                  <el-form label-width="128px" label-position="left">
-                    <el-form-item label="内存块数">
-                      <el-input-number v-model="os.config.frameCount" :min="2" :max="32" />
-                    </el-form-item>
-                    <el-form-item label="块长">
-                      <el-input-number v-model="os.config.blockSize" :min="1" :max="4096" />
-                    </el-form-item>
-                    <el-form-item label="资源总量">
-                      <el-input-number v-model="os.config.resTotal" :min="1" :max="50" />
-                    </el-form-item>
-                    <el-form-item label="柱面总数">
-                      <el-input-number v-model="os.config.cylinders" :min="20" :max="500" :step="10" />
-                    </el-form-item>
-                    <el-form-item label="每柱面磁道数">
-                      <el-input-number v-model="os.config.tracksPerCyl" :min="1" :max="16" />
-                    </el-form-item>
-                    <el-form-item label="每磁道记录数">
-                      <el-input-number v-model="os.config.recordsPerTrack" :min="1" :max="32" />
-                    </el-form-item>
-                  </el-form>
-                </div>
-              </el-col>
-            </el-row>
-
-            <el-row :gutter="14" class="advanced-data">
-              <el-col :xs="24" :md="10">
-                <div class="advanced-block">
-                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                    <h4 style="margin: 0;">页面访问流</h4>
-                    <el-switch v-model="os.config.dynamicPages" size="small" active-text="动态生成" />
-                  </div>
-                  <el-input
-                    v-if="!os.config.dynamicPages"
-                    v-model="os.config.refStringText"
-                    type="textarea"
-                    :rows="4"
-                    placeholder="逗号分隔的页号序列"
-                  />
-                  <p class="hint">
-                    <el-icon><InfoFilled /></el-icon>
-                    <span v-if="os.config.dynamicPages">
-                      已启用动态模式：进程的页面序列由空间局部性（连续访问）和时间局部性（循环执行）算法动态生成。
-                    </span>
-                    <span v-else>
-                      解析后页数：{{ parsedRef.length }} · 最大页号：{{ maxPage }}
-                    </span>
-                  </p>
-                </div>
-              </el-col>
-
-              <el-col :xs="24" :md="14">
-                <div class="advanced-block">
-                  <div class="table-head">
-                    <h4>I/O 请求详细表</h4>
-                    <el-button size="small" plain @click="addReq"><el-icon><Plus /></el-icon> 添加请求</el-button>
-                  </div>
-                  <el-table :data="os.config.ioRequests" size="small" max-height="260" empty-text="暂无请求，点击添加">
-                    <el-table-column label="进程名" width="110">
-                      <template #default="{ row }">
-                        <el-input v-model="row.进程名" size="small" />
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="柱面号">
-                      <template #default="{ row }">
-                        <el-input-number v-model="row.柱面号" size="small" :min="0" :max="os.config.cylinders - 1" controls-position="right" style="width: 100%;" />
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="磁道号">
-                      <template #default="{ row }">
-                        <el-input-number v-model="row.磁道号" size="small" :min="0" :max="os.config.tracksPerCyl - 1" controls-position="right" style="width: 100%;" />
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="物理记录号">
-                      <template #default="{ row }">
-                        <el-input-number v-model="row.物理记录号" size="small" :min="0" :max="os.config.recordsPerTrack - 1" controls-position="right" style="width: 100%;" />
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="操作" width="70">
-                      <template #default="{ $index }">
-                        <el-button type="danger" link size="small" @click="removeReq($index)"><el-icon><Delete /></el-icon></el-button>
-                      </template>
-                    </el-table-column>
-                  </el-table>
-                </div>
-              </el-col>
-            </el-row>
+            <div class="advanced-block">
+              <h4>磁盘物理几何（所有 I/O 与缺页计算共用）</h4>
+              <el-form label-width="128px" label-position="left">
+                <el-form-item label="柱面总数">
+                  <el-input-number v-model="os.config.cylinders" :min="20" :max="500" :step="10" />
+                </el-form-item>
+                <el-form-item label="每柱面磁道数">
+                  <el-input-number v-model="os.config.tracksPerCyl" :min="1" :max="16" />
+                </el-form-item>
+                <el-form-item label="每磁道记录数">
+                  <el-input-number v-model="os.config.recordsPerTrack" :min="1" :max="32" />
+                </el-form-item>
+              </el-form>
+              <p class="hint">
+                <el-icon><InfoFilled /></el-icon>
+                改动后请记得点上方"应用配置"重建模拟；磁盘实验的请求柱面号会按此 clamp。
+              </p>
+            </div>
           </el-collapse-item>
         </el-collapse>
       </el-col>
@@ -327,9 +325,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onActivated, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useOsStore } from '../store/os'
 import { useOsDriver } from '../mock/driver'
 import { EXPERIMENTS, experimentById } from '../mock/experiments'
@@ -341,8 +339,24 @@ const driver = useOsDriver()
 const route = useRoute()
 const router = useRouter()
 const experiments = EXPERIMENTS
-const activeExperimentId = ref('paging')
-const advancedOpen = ref([])
+// 默认实验：query 参数 > 上次选择(localStorage) > 上一路由对应的实验 > 'paging' 兜底。
+// 防止"我从处理机调度页过来，结果默认看到的是页面置换实验"的困惑。
+const LAST_EXP_KEY = 'quad-os:last-experiment'
+const ROUTE_TO_EXP = { '/core/processor': 'processor', '/core/memory': 'paging', '/core/device': 'disk', '/core/resource': 'banker' }
+function inferInitialExperimentId() {
+  const q = route.query.experiment
+  if (q && experimentById(q)) return q
+  try {
+    const last = localStorage.getItem(LAST_EXP_KEY)
+    if (last && experimentById(last)) return last
+  } catch (e) { /* ignore */ }
+  const backPath = router.options.history.state?.back
+  if (backPath && ROUTE_TO_EXP[backPath]) return ROUTE_TO_EXP[backPath]
+  return 'paging'
+}
+const activeExperimentId = ref(inferInitialExperimentId())
+// 全局参数面板默认展开 —— 让用户一眼看到磁盘几何 / 时钟速度这类跨实验参数。
+const advancedOpen = ref(['advanced'])
 const sched = ['FCFS', 'SJF', 'HRRN', 'PRIORITY', 'RR']
 const page = ['FIFO', 'LRU', 'OPT', 'CLOCK']
 const disk = ['FCFS', 'SSTF', 'SCAN', 'C-SCAN', 'LOOK', 'C-LOOK']
@@ -354,9 +368,21 @@ const maxPage = computed(() => {
   return parsedRef.value.length ? Math.max(...parsedRef.value) : 0
 })
 const processConfig = computed(() => os.config.processes || [])
+const pvProducerCount = computed(() => (os.config.processes || []).filter(p => p.pvRole === 'producer').length)
+const pvConsumerCount = computed(() => (os.config.processes || []).filter(p => p.pvRole === 'consumer').length)
+// 银行家矩阵的行 = 当前进程列表；保证 bankerMax/bankerAllocation 行数和进程数一致。
+const bankerRows = computed(() => {
+  const procs = os.config.processes || []
+  if (!os.config.bankerMax) os.config.bankerMax = []
+  if (!os.config.bankerAllocation) os.config.bankerAllocation = []
+  while (os.config.bankerMax.length < procs.length) os.config.bankerMax.push([0, 0, 0])
+  while (os.config.bankerAllocation.length < procs.length) os.config.bankerAllocation.push([0, 0, 0])
+  return procs
+})
 
 function selectExperiment(id) {
   activeExperimentId.value = id
+  try { localStorage.setItem(LAST_EXP_KEY, id) } catch (e) { /* ignore */ }
 }
 
 function addReq() {
@@ -385,6 +411,7 @@ function addProcess() {
     arrival: 0,
     burst: 5,
     priority: 1,
+    pvRole: '',
   })
 }
 
@@ -419,13 +446,23 @@ async function startExperiment() {
   driver.pause()
   os.applyConfig()
   await driver.checkBackend()
-  ElMessage.success('已开始：' + currentExperiment.value.title + '，请使用顶部“单步/运行”观察过程')
   router.push(currentExperiment.value.route)
+  ElMessage.success(`已应用配置并跳转：${currentExperiment.value.title}，点击顶部「运行」开始自动推进时钟，或用「单步」逐拍观察`)
 }
 async function reset() {
+  try {
+    await ElMessageBox.confirm(
+      '将清除你修改过的进程表 / I/O 请求 / 页面访问串 / 时间片等所有自定义参数（包括本地缓存与后端持久化），并按出厂默认重建模拟。继续？',
+      '恢复出厂默认',
+      { type: 'warning', confirmButtonText: '确认清除', cancelButtonText: '取消', confirmButtonClass: 'el-button--danger' }
+    )
+  } catch (e) {
+    return  // 用户取消
+  }
   await driver.reset(false)
   activeExperimentId.value = 'paging'
-  ElMessage.success('已恢复默认并重置模拟')
+  try { localStorage.removeItem(LAST_EXP_KEY) } catch (e) { /* ignore */ }
+  ElMessage.success('已恢复出厂默认并重置模拟')
 }
 
 function loadFromRoute(id) {
@@ -434,6 +471,11 @@ function loadFromRoute(id) {
 }
 
 onMounted(() => loadFromRoute(route.query.experiment))
+// keep-alive 下组件被复用：每次重新激活时按"路由 + 上次选择"重新推断默认实验，
+// 避免"从处理机调度页过来却看到页面置换"的困惑。
+onActivated(() => {
+  activeExperimentId.value = inferInitialExperimentId()
+})
 watch(() => route.query.experiment, loadFromRoute)
 </script>
 
@@ -496,12 +538,17 @@ watch(() => route.query.experiment, loadFromRoute)
 .process-editor { border: 1px solid #eef2f7; border-radius: 8px; background: #fbfdff; padding: 12px; margin-top: 4px; }
 .request-cylinder-list { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
 .request-cylinder-list .el-input-number { width: 104px; }
-.action-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.banker-vec { display: flex; gap: 8px; flex-wrap: wrap; }
+.banker-vec .el-input-number { width: 110px; }
+.action-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; align-items: center; }
+.action-spacer { flex: 1; }
+.current-head-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .advanced-panel { margin-top: 14px; border: 1px solid #e8eef5; border-radius: 8px; background: #fff; padding: 0 12px; }
 .advanced-title { margin-right: 10px; font-weight: 700; color: var(--qos-text); }
 .advanced-sub { color: var(--qos-muted); font-size: 12px; }
 .advanced-block { border: 1px solid #edf2f7; border-radius: 8px; background: #fbfdff; padding: 12px; margin-bottom: 14px; }
 .advanced-block h4 { margin: 0 0 12px; font-size: 14px; color: var(--qos-text); }
+.form-hint { margin: 4px 0 0; font-size: 12px; color: var(--qos-muted); line-height: 1.45; }
 .advanced-data { margin-top: 2px; }
 .table-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .table-head h4 { margin: 0; }

@@ -15,6 +15,7 @@
       "arrival": 0,
       "burst": 12,
       "priority": 1,
+      "pvRole": "",
       "state": "运行",
       "ran": 0,
       "blockedReason": "",
@@ -143,6 +144,7 @@
       "arrival": 0,
       "burst": 6,
       "priority": 2,
+      "pvRole": "consumer",
       "state": "就绪",
       "ran": 0,
       "blockedReason": "",
@@ -271,6 +273,7 @@
       "arrival": 0,
       "burst": 9,
       "priority": 4,
+      "pvRole": "",
       "state": "就绪",
       "ran": 0,
       "blockedReason": "",
@@ -399,6 +402,7 @@
       "arrival": 0,
       "burst": 5,
       "priority": 2,
+      "pvRole": "producer",
       "state": "就绪",
       "ran": 0,
       "blockedReason": "",
@@ -527,6 +531,7 @@
       "arrival": 0,
       "burst": 7,
       "priority": 3,
+      "pvRole": "producer",
       "state": "就绪",
       "ran": 0,
       "blockedReason": "",
@@ -993,35 +998,40 @@
         "name": "init",
         "arrival": 0,
         "burst": 12,
-        "priority": 1
+        "priority": 1,
+        "pvRole": ""
       },
       {
         "pid": 2,
         "name": "shell",
         "arrival": 0,
         "burst": 6,
-        "priority": 2
+        "priority": 2,
+        "pvRole": "consumer"
       },
       {
         "pid": 3,
         "name": "editor",
         "arrival": 0,
         "burst": 9,
-        "priority": 4
+        "priority": 4,
+        "pvRole": ""
       },
       {
         "pid": 4,
         "name": "logger",
         "arrival": 0,
         "burst": 5,
-        "priority": 2
+        "priority": 2,
+        "pvRole": "producer"
       },
       {
         "pid": 5,
         "name": "daemon",
         "arrival": 0,
         "burst": 7,
-        "priority": 3
+        "priority": 3,
+        "pvRole": "producer"
       }
     ],
     "refStringText": "7,0,1,2,0,3,0,4,2,3,0,3,2,1,2",
@@ -1074,6 +1084,69 @@
         "磁道号": 0,
         "物理记录号": 0
       }
-    ]
+    ],
+    "bankerAvailable": [
+      3,
+      3,
+      2
+    ],
+    "bankerMax": [
+      [
+        7,
+        5,
+        3
+      ],
+      [
+        3,
+        2,
+        2
+      ],
+      [
+        9,
+        0,
+        2
+      ],
+      [
+        2,
+        2,
+        2
+      ],
+      [
+        4,
+        3,
+        3
+      ]
+    ],
+    "bankerAllocation": [
+      [
+        0,
+        1,
+        0
+      ],
+      [
+        2,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        2
+      ],
+      [
+        2,
+        1,
+        1
+      ],
+      [
+        0,
+        0,
+        2
+      ]
+    ],
+    "syncCapacity": 4,
+    "syncS1Init": 4,
+    "syncS2Init": 0,
+    "syncMutexInit": 1
   }
 }

@@ -11,11 +11,19 @@
           <text v-else :x="(x(seg.开始) + x(seg.结束)) / 2" y="61" text-anchor="middle"
             font-size="13" fill="#9aa4b6" font-weight="600">{{ seg.作业 }}</text>
         </g>
+        <g v-for="b in quantumLines" :key="'q' + b">
+          <line :x1="x(b)" y1="34" :x2="x(b)" y2="78" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3 3" opacity="0.35" />
+        </g>
         <g v-for="b in ticks" :key="'b' + b">
           <line :x1="x(b)" y1="78" :x2="x(b)" y2="84" stroke="#9aa4b6" />
           <text :x="x(b)" y="98" text-anchor="middle" font-size="11" fill="#6b77a0">{{ b }}</text>
         </g>
         <line :x1="margin" y1="78" :x2="x(maxTime)" y2="78" stroke="#cdd5e3" />
+        <g v-if="cursorTime !== null && cursorTime >= 0 && cursorTime <= axisTime">
+          <line :x1="x(cursorTime)" y1="20" :x2="x(cursorTime)" y2="90" stroke="#e64a45" stroke-width="2" />
+          <polygon :points="`${x(cursorTime)-5},20 ${x(cursorTime)+5},20 ${x(cursorTime)},28`" fill="#e64a45" />
+          <text :x="x(cursorTime)" y="16" text-anchor="middle" font-size="11" font-weight="600" fill="#e64a45">t={{ cursorTime }}</text>
+        </g>
       </svg>
     </div>
     <el-empty v-else description="点击「运行」查看甘特图" :image-size="60" />
@@ -28,6 +36,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 const props = defineProps({
   gantt: { type: Array, default: () => [] },
   reveal: { type: Number, default: -1 },
+  // 当前时钟位置 —— 显示红色游标。null/undefined 时隐藏。
+  cursorTime: { type: Number, default: null },
+  // 时间片大小 —— 每 quantum 拍画浅蓝虚线，0/null 时不画。
+  quantum: { type: Number, default: 0 },
 })
 
 const margin = 34
@@ -51,6 +63,14 @@ const unitW = computed(() => {
 })
 const contentWidth = computed(() => Math.max(viewportWidth.value, margin + axisTime.value * unitW.value + rightMargin))
 const ticks = computed(() => Array.from({ length: axisTime.value + 1 }, (_, i) => i))
+// quantum 边界：从 quantum、2*quantum…到 axisTime；不含 0（与 y 轴起点重合）。
+const quantumLines = computed(() => {
+  const q = Number(props.quantum) || 0
+  if (q <= 0) return []
+  const out = []
+  for (let t = q; t <= axisTime.value; t += q) out.push(t)
+  return out
+})
 
 function x(t) {
   return margin + t * unitW.value
