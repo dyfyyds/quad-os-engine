@@ -1012,7 +1012,10 @@ function addDeterministicArrival(state, t, rng, push) {
 function recomputeRuntimeMetrics(state) {
   const used = state.memory.frames.filter((x) => x !== null).length
   const refs = state.memory.faults + state.memory.hits
-  const busy = state.gantt.reduce((sum, seg) => sum + Math.max(0, seg.结束 - seg.开始), 0)
+  const busy = state.gantt.reduce(
+    (sum, seg) => sum + (seg.作业 === '空闲' ? 0 : Math.max(0, seg.结束 - seg.开始)),
+    0,
+  )
   const completed = state.processes.filter((p) => p.state === '完成')
   recomputeDiskBusyRate(state)
 

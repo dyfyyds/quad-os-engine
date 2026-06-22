@@ -950,7 +950,11 @@ def _add_deterministic_arrival(state, t, rng, push):
 def _recompute_runtime_metrics(state):
     used = len([x for x in state["memory"]["frames"] if x is not None])
     refs = state["memory"]["faults"] + state["memory"]["hits"]
-    busy = sum(max(0, seg["结束"] - seg["开始"]) for seg in state["gantt"])
+    busy = sum(
+        max(0, seg["结束"] - seg["开始"])
+        for seg in state["gantt"]
+        if seg["作业"] != "空闲"
+    )
     completed = [p for p in state["processes"] if p["state"] == "完成"]
     _recompute_disk_busy_rate(state)
 
