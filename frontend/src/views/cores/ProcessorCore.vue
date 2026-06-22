@@ -68,7 +68,7 @@
     </SectionCard>
 
     <SectionCard title="CPU 执行甘特图" icon="Histogram" style="margin-bottom: 14px;">
-      <GanttChart :gantt="os.gantt" />
+      <GanttChart :gantt="os.gantt" :cursor-time="os.clock" :quantum="os.config.schedAlgo === 'RR' ? os.config.quantum : 0" />
     </SectionCard>
 
     <el-row :gutter="14">
