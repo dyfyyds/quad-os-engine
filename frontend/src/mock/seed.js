@@ -95,6 +95,11 @@ export const DEFAULT_CONFIG = {
   bankerAvailable: [3, 3, 2],
   bankerMax: [[7, 5, 3], [3, 2, 2], [9, 0, 2], [2, 2, 2], [4, 3, 3]],
   bankerAllocation: [[0, 1, 0], [2, 0, 0], [3, 0, 2], [2, 1, 1], [0, 0, 2]],
+  // PV 同步实验初值（缓冲区/三个信号量）
+  syncCapacity: 4,
+  syncS1Init: 4,    // 空闲槽数（= capacity）
+  syncS2Init: 0,    // 产品数
+  syncMutexInit: 1, // 互斥锁
 }
 
 const MAX = [[7, 5, 3], [3, 2, 2], [9, 0, 2], [2, 2, 2], [4, 3, 3]]
@@ -294,6 +299,11 @@ export function seedState(cfg) {
     ? config.bankerMax.map(row => [...row]) : DEFAULT_CONFIG.bankerMax.map(row => [...row])
   config.bankerAllocation = Array.isArray(config.bankerAllocation)
     ? config.bankerAllocation.map(row => [...row]) : DEFAULT_CONFIG.bankerAllocation.map(row => [...row])
+  // PV 同步初值兼容化
+  if (config.syncCapacity == null) config.syncCapacity = DEFAULT_CONFIG.syncCapacity
+  if (config.syncS1Init == null) config.syncS1Init = DEFAULT_CONFIG.syncS1Init
+  if (config.syncS2Init == null) config.syncS2Init = DEFAULT_CONFIG.syncS2Init
+  if (config.syncMutexInit == null) config.syncMutexInit = DEFAULT_CONFIG.syncMutexInit
   config.processes = (config.processes || DEFAULT_CONFIG.processes).map((p, i) => ({
     pid: Number(p.pid) || i + 1,
     name: String(p.name || `P${i + 1}`).trim() || `P${i + 1}`,
@@ -375,12 +385,13 @@ export function seedState(cfg) {
       deadlock: false,
     },
 
-    // —— 进程同步（PV）—— 缓冲区容量4，s1初值4，s2初值0，互斥量mutex初值1
+    // —— 进程同步（PV）—— 初值来自 config (syncCapacity/syncS1Init/syncS2Init/syncMutexInit)，
+    // 兼容旧 fixture 在 config 未提供时回落到默认 (4 / 4 / 0 / 1)
     sync: {
-      capacity: 4,
-      s1: 4,
-      s2: 0,
-      mutex: 1,
+      capacity: Number(config.syncCapacity ?? 4),
+      s1: Number(config.syncS1Init ?? 4),
+      s2: Number(config.syncS2Init ?? 0),
+      mutex: Number(config.syncMutexInit ?? 1),
       buffer: 0,
       produced: 0,
       consumed: 0,

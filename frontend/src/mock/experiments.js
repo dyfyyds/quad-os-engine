@@ -78,6 +78,23 @@ export const EXPERIMENTS = [
     route: '/core/resource',
     config: {},
   },
+  {
+    id: 'sync',
+    title: '进程同步实验（PV）',
+    icon: 'Switch',
+    color: '#ec4899',
+    target: '观察生产者-消费者共享缓冲区时，s1（空闲槽）、s2（产品）、mutex（互斥锁）三个信号量如何配合，以及阻塞队列的形成与唤醒。',
+    inputs: '缓冲区容量 4；s1 初值=容量、s2 初值=0、mutex 初值=1。进程表里 PV 角色=生产者/消费者 的进程会自动参与。',
+    expected: '生产者填满缓冲区后会 P(s1) 阻塞；消费者取空后 P(s2) 阻塞；两个进程同时争锁时互斥队列出现。',
+    view: '进程与资源：查看 BufferRing 缓冲环 + 三个信号量数值 + 同步阻塞队列。',
+    route: '/core/resource',
+    config: {
+      syncCapacity: 4,
+      syncS1Init: 4,
+      syncS2Init: 0,
+      syncMutexInit: 1,
+    },
+  },
 ]
 
 export const experimentById = (id) => EXPERIMENTS.find((item) => item.id === id)

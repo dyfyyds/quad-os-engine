@@ -197,6 +197,30 @@
               <p class="hint"><el-icon><InfoFilled /></el-icon> 初始磁头位置固定为 53；柱面/磁道/记录数上界来自【全局参数 / 磁盘物理几何】，改动后请重新应用配置。</p>
             </template>
 
+            <template v-else-if="activeExperimentId === 'sync'">
+              <el-form-item label="缓冲区容量">
+                <el-input-number v-model="os.config.syncCapacity" :min="1" :max="20" />
+                <p class="form-hint">生产者-消费者共享缓冲区可放置的产品上限</p>
+              </el-form-item>
+              <el-form-item label="s1 初值（空闲槽）">
+                <el-input-number v-model="os.config.syncS1Init" :min="0" :max="20" />
+                <p class="form-hint">通常 = 缓冲区容量；生产者 P(s1) 时递减</p>
+              </el-form-item>
+              <el-form-item label="s2 初值（产品数）">
+                <el-input-number v-model="os.config.syncS2Init" :min="0" :max="20" />
+                <p class="form-hint">通常 = 0；消费者 P(s2) 时递减</p>
+              </el-form-item>
+              <el-form-item label="mutex 初值（互斥）">
+                <el-input-number v-model="os.config.syncMutexInit" :min="0" :max="5" />
+                <p class="form-hint">通常 = 1；进入临界区前 P(mutex)，退出时 V(mutex)</p>
+              </el-form-item>
+              <p class="hint">
+                <el-icon><InfoFilled /></el-icon>
+                哪些进程参与 PV 同步？在「处理机调度实验」的进程表里设置 PV 角色为"生产者/消费者"。当前
+                <b>{{ pvProducerCount }}</b> 个生产者 + <b>{{ pvConsumerCount }}</b> 个消费者。
+              </p>
+            </template>
+
             <template v-else>
               <el-form-item label="可用资源 Available">
                 <div class="banker-vec">
@@ -344,6 +368,8 @@ const maxPage = computed(() => {
   return parsedRef.value.length ? Math.max(...parsedRef.value) : 0
 })
 const processConfig = computed(() => os.config.processes || [])
+const pvProducerCount = computed(() => (os.config.processes || []).filter(p => p.pvRole === 'producer').length)
+const pvConsumerCount = computed(() => (os.config.processes || []).filter(p => p.pvRole === 'consumer').length)
 // 银行家矩阵的行 = 当前进程列表；保证 bankerMax/bankerAllocation 行数和进程数一致。
 const bankerRows = computed(() => {
   const procs = os.config.processes || []
