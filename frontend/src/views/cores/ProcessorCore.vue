@@ -81,7 +81,7 @@
             <el-table-column prop="arrival" label="到达" width="64" />
             <el-table-column prop="burst" label="服务" width="64" />
             <el-table-column label="进度" width="140"><template #default="{ row }">
-              <el-progress :percentage="Math.min(100, Math.round(row.ran / row.burst * 100))" :stroke-width="10" />
+              <el-progress :percentage="Math.min(100, Math.round(row.ran / row.burst * 100))" :stroke-width="10" :format="() => `${row.ran}/${row.burst}`" />
             </template></el-table-column>
             <el-table-column prop="priority" label="优先级" width="72" />
             <el-table-column label="PV 角色" width="92">
