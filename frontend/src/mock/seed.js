@@ -91,6 +91,10 @@ export const DEFAULT_CONFIG = {
     { 进程名: '进程7', 柱面号: 65, 磁道号: 3, 物理记录号: 6 },
     { 进程名: '进程8', 柱面号: 67, 磁道号: 0, 物理记录号: 0 },
   ],
+  // 银行家实验矩阵（每行对应同名进程；多余进程在 seedState 里随机补齐）
+  bankerAvailable: [3, 3, 2],
+  bankerMax: [[7, 5, 3], [3, 2, 2], [9, 0, 2], [2, 2, 2], [4, 3, 3]],
+  bankerAllocation: [[0, 1, 0], [2, 0, 0], [3, 0, 2], [2, 1, 1], [0, 0, 2]],
 }
 
 const MAX = [[7, 5, 3], [3, 2, 2], [9, 0, 2], [2, 2, 2], [4, 3, 3]]
@@ -282,6 +286,14 @@ export function seedState(cfg) {
   const config = { ...DEFAULT_CONFIG, ...(cfg || {}) }
   // 深拷贝可编辑数据，避免与已 seed 的运行态共享引用
   config.ioRequests = (config.ioRequests || DEFAULT_CONFIG.ioRequests).map((r) => ({ ...r }))
+  // 银行家矩阵兼容化：旧 config (从后端/localStorage hydrate) 没有这些字段时
+  // 用 DEFAULT_CONFIG 兜底，保证 SystemSettings 直接绑定不会报错。
+  config.bankerAvailable = Array.isArray(config.bankerAvailable) && config.bankerAvailable.length === 3
+    ? [...config.bankerAvailable] : [...DEFAULT_CONFIG.bankerAvailable]
+  config.bankerMax = Array.isArray(config.bankerMax)
+    ? config.bankerMax.map(row => [...row]) : DEFAULT_CONFIG.bankerMax.map(row => [...row])
+  config.bankerAllocation = Array.isArray(config.bankerAllocation)
+    ? config.bankerAllocation.map(row => [...row]) : DEFAULT_CONFIG.bankerAllocation.map(row => [...row])
   config.processes = (config.processes || DEFAULT_CONFIG.processes).map((p, i) => ({
     pid: Number(p.pid) || i + 1,
     name: String(p.name || `P${i + 1}`).trim() || `P${i + 1}`,
@@ -308,13 +320,16 @@ export function seedState(cfg) {
   }
 
   // 动态构建资源池矩阵，长度与 processes 一致
+  // 优先用 config.bankerMax/bankerAllocation；不足以覆盖所有进程时回落到教材样例 + 随机生成。
   const numProcs = processes.length
+  const cfgMax = Array.isArray(config.bankerMax) ? config.bankerMax : MAX
+  const cfgAlloc = Array.isArray(config.bankerAllocation) ? config.bankerAllocation : ALLOC
   const maxMatrix = []
   const allocMatrix = []
   for (let i = 0; i < numProcs; i++) {
-    if (i < 5) {
-      maxMatrix.push([...MAX[i]])
-      allocMatrix.push([...ALLOC[i]])
+    if (i < cfgMax.length && i < cfgAlloc.length) {
+      maxMatrix.push([...cfgMax[i]])
+      allocMatrix.push([...cfgAlloc[i]])
     } else {
       maxMatrix.push([
         Math.floor(rng.next() * 4) + 1,
@@ -325,6 +340,8 @@ export function seedState(cfg) {
     }
   }
   const needMatrix = need(maxMatrix, allocMatrix)
+  const availVec = Array.isArray(config.bankerAvailable) && config.bankerAvailable.length === 3
+    ? [...config.bankerAvailable] : [3, 3, 2]
 
   return {
     clock: 0,
@@ -350,7 +367,7 @@ export function seedState(cfg) {
     // —— 资源核心（银行家）——
     resources: {
       types: ['R0', 'R1', 'R2'],
-      available: [3, 3, 2],
+      available: availVec,
       max: maxMatrix,
       allocation: allocMatrix,
       need: needMatrix,

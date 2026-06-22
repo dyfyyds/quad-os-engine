@@ -198,14 +198,53 @@
             </template>
 
             <template v-else>
-              <el-form-item label="资源总量">
-                <el-input-number v-model="os.config.resTotal" :min="1" :max="50" />
+              <el-form-item label="可用资源 Available">
+                <div class="banker-vec">
+                  <el-input-number v-for="(_, j) in 3" :key="j" v-model="os.config.bankerAvailable[j]" :min="0" :max="20" size="small" controls-position="right" />
+                </div>
+                <p class="form-hint">三种资源 R0 / R1 / R2 的初始可用量</p>
               </el-form-item>
-              <div class="matrix-note">
-                <div><span>Available</span><b>[3, 3, 2]</b></div>
-                <div><span>资源矩阵</span><b>使用默认 Max / Allocation 教材样例</b></div>
-                <div><span>预期结果</span><b>可观察安全序列；不满足条件时出现告警。</b></div>
+              <div class="process-editor">
+                <div class="table-head">
+                  <h4>资源矩阵 · Max / Allocation （Need = Max - Alloc，自动计算）</h4>
+                </div>
+                <el-table :data="bankerRows" size="small" :show-summary="false" empty-text="无进程">
+                  <el-table-column label="进程" width="92">
+                    <template #default="{ row }">{{ row.name }}</template>
+                  </el-table-column>
+                  <el-table-column label="Max R0" width="90">
+                    <template #default="{ $index }">
+                      <el-input-number v-model="os.config.bankerMax[$index][0]" :min="0" :max="20" size="small" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="Max R1" width="90">
+                    <template #default="{ $index }">
+                      <el-input-number v-model="os.config.bankerMax[$index][1]" :min="0" :max="20" size="small" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="Max R2" width="90">
+                    <template #default="{ $index }">
+                      <el-input-number v-model="os.config.bankerMax[$index][2]" :min="0" :max="20" size="small" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="Alloc R0" width="92">
+                    <template #default="{ $index }">
+                      <el-input-number v-model="os.config.bankerAllocation[$index][0]" :min="0" :max="os.config.bankerMax[$index][0] || 0" size="small" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="Alloc R1" width="92">
+                    <template #default="{ $index }">
+                      <el-input-number v-model="os.config.bankerAllocation[$index][1]" :min="0" :max="os.config.bankerMax[$index][1] || 0" size="small" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="Alloc R2" width="92">
+                    <template #default="{ $index }">
+                      <el-input-number v-model="os.config.bankerAllocation[$index][2]" :min="0" :max="os.config.bankerMax[$index][2] || 0" size="small" controls-position="right" style="width: 100%;" />
+                    </template>
+                  </el-table-column>
+                </el-table>
               </div>
+              <p class="hint"><el-icon><InfoFilled /></el-icon> 行数 = 进程表里的进程数；改进程表后请重新"应用配置"使矩阵重新对齐。Allocation 上界自动 clamp 到对应 Max 值。</p>
             </template>
           </el-form>
 
@@ -305,6 +344,15 @@ const maxPage = computed(() => {
   return parsedRef.value.length ? Math.max(...parsedRef.value) : 0
 })
 const processConfig = computed(() => os.config.processes || [])
+// 银行家矩阵的行 = 当前进程列表；保证 bankerMax/bankerAllocation 行数和进程数一致。
+const bankerRows = computed(() => {
+  const procs = os.config.processes || []
+  if (!os.config.bankerMax) os.config.bankerMax = []
+  if (!os.config.bankerAllocation) os.config.bankerAllocation = []
+  while (os.config.bankerMax.length < procs.length) os.config.bankerMax.push([0, 0, 0])
+  while (os.config.bankerAllocation.length < procs.length) os.config.bankerAllocation.push([0, 0, 0])
+  return procs
+})
 
 function selectExperiment(id) {
   activeExperimentId.value = id
@@ -464,6 +512,8 @@ watch(() => route.query.experiment, loadFromRoute)
 .process-editor { border: 1px solid #eef2f7; border-radius: 8px; background: #fbfdff; padding: 12px; margin-top: 4px; }
 .request-cylinder-list { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
 .request-cylinder-list .el-input-number { width: 104px; }
+.banker-vec { display: flex; gap: 8px; flex-wrap: wrap; }
+.banker-vec .el-input-number { width: 110px; }
 .action-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; align-items: center; }
 .action-spacer { flex: 1; }
 .current-head-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
