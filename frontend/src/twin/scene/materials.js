@@ -28,6 +28,18 @@ export function createMaterials() {
     chrome: new P({ color: 0xe8edf2, metalness: 1.0, roughness: 0.08 }),
     // 玻璃封顶（SoC / 罩）
     glass: new P({ color: 0xffffff, metalness: 0, roughness: 0.05, transmission: 0.9, thickness: 0.5, transparent: true, opacity: 0.45 }),
+    // 锡焊点 / 焊球（BGA 球栅阵列）
+    solder: new P({ color: 0xb0b8bf, metalness: 0.85, roughness: 0.35 }),
+    // 拉丝铜走线（总线车道）—— 比 copper 暗一点突出多车道层次
+    copperTrace: new P({ color: 0xa86833, metalness: 0.92, roughness: 0.38, clearcoat: 0.2, clearcoatRoughness: 0.35 }),
+    // 北桥 / 南桥芯片散热盖 —— 拉丝铝磨砂
+    bridgeIHS: new P({ color: 0xa5a9ad, metalness: 0.92, roughness: 0.5 }),
+    // RGB 光导 / 半透明扩散罩
+    diffuser: new P({ color: 0xffffff, metalness: 0, roughness: 0.15, transmission: 0.55, thickness: 0.3, transparent: true, opacity: 0.6 }),
+    // 黑色橡胶 / 软导轨（保持框衬垫、缓震圈）
+    rubber: new P({ color: 0x18181c, metalness: 0.0, roughness: 0.95 }),
+    // 标签贴纸（盘面 / SSD 顶贴）
+    labelPaper: new P({ color: 0xe7e9ec, metalness: 0.0, roughness: 0.8 }),
   }
 }
 

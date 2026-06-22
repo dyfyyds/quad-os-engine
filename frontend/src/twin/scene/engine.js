@@ -4,6 +4,7 @@ import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
 import { createPipeline } from './pipeline.js'
 import { createMaterials, disposeMaterials } from './materials.js'
 import { buildStage } from './stage.js'
+import { buildBus } from './bus.js'
 import { buildKernel } from './cores/kernel.js'
 import { CORE_POS } from './layout.js'
 import { buildProcessor } from './cores/processor.js'
@@ -119,6 +120,9 @@ export function createTwinScene(container) {
   function buildContents() {
     const stage = buildStage(scene, materials)
     updaters.push(stage.update)
+
+    const bus = buildBus(scene, materials)
+    updaters.push(bus.update)
 
     const kernel = buildKernel(scene, materials)
     updaters.push(kernel.update)
