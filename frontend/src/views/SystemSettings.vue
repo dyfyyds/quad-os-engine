@@ -43,7 +43,12 @@
               </div>
               <p>{{ currentExperiment.target }}</p>
             </div>
-            <el-tag effect="plain">{{ currentExperiment.route }}</el-tag>
+            <div class="current-head-right">
+              <el-button link type="primary" @click="loadExperiment(currentExperiment)">
+                <el-icon><Download /></el-icon> 加载经典样例
+              </el-button>
+              <el-tag effect="plain">{{ currentExperiment.route }}</el-tag>
+            </div>
           </div>
 
           <div class="summary-grid">
@@ -205,10 +210,10 @@
           </el-form>
 
           <div class="action-bar">
-            <el-button plain @click="loadExperiment(currentExperiment)"><el-icon><Download /></el-icon> 加载经典样例</el-button>
-            <el-button type="primary" @click="startExperiment"><el-icon><VideoPlay /></el-icon> 开始实验并查看</el-button>
-            <el-button @click="save"><el-icon><Check /></el-icon> 应用配置</el-button>
             <el-button type="danger" plain @click="reset"><el-icon><RefreshLeft /></el-icon> 恢复出厂默认</el-button>
+            <span class="action-spacer" />
+            <el-button @click="save"><el-icon><Check /></el-icon> 应用配置</el-button>
+            <el-button type="primary" @click="startExperiment"><el-icon><VideoPlay /></el-icon> 应用并跳转</el-button>
           </div>
         </SectionCard>
 
@@ -367,8 +372,8 @@ async function startExperiment() {
   driver.pause()
   os.applyConfig()
   await driver.checkBackend()
-  ElMessage.success('已开始：' + currentExperiment.value.title + '，请使用顶部“单步/运行”观察过程')
   router.push(currentExperiment.value.route)
+  ElMessage.success(`已应用配置并跳转：${currentExperiment.value.title}，点击顶部「运行」开始自动推进时钟，或用「单步」逐拍观察`)
 }
 async function reset() {
   try {
@@ -459,7 +464,9 @@ watch(() => route.query.experiment, loadFromRoute)
 .process-editor { border: 1px solid #eef2f7; border-radius: 8px; background: #fbfdff; padding: 12px; margin-top: 4px; }
 .request-cylinder-list { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
 .request-cylinder-list .el-input-number { width: 104px; }
-.action-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.action-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; align-items: center; }
+.action-spacer { flex: 1; }
+.current-head-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .advanced-panel { margin-top: 14px; border: 1px solid #e8eef5; border-radius: 8px; background: #fff; padding: 0 12px; }
 .advanced-title { margin-right: 10px; font-weight: 700; color: var(--qos-text); }
 .advanced-sub { color: var(--qos-muted); font-size: 12px; }
