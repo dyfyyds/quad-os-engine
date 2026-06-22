@@ -95,6 +95,64 @@ export function buildDevice({ scene, materials, position }) {
   rwLed.position.set(0, 0.04, -1.85)
   arm.add(rwLed)
 
+  // —— VCM (Voice Coil Motor) ：作动臂尾部的扇形线圈 + 上下两片永磁体 + 钢轭 ——
+  // 用 RingGeometry 切扇形做线圈，再用两片扁长方体做磁铁
+  // 线圈：以 bearing 为中心向 +Z 方向延伸的扇形（与磁头臂相反方向）
+  const coilMat = new THREE.MeshPhysicalMaterial({ color: 0xb87333, metalness: 0.85, roughness: 0.45 })
+  // 用环形扇形（thetaStart/Length）+ 多圈细环模拟铜线圈
+  const coilWedge = new THREE.Mesh(
+    new THREE.RingGeometry(0.42, 0.78, 18, 1, -Math.PI / 4, Math.PI / 2),
+    coilMat,
+  )
+  coilWedge.rotation.x = -Math.PI / 2  // 水平铺
+  coilWedge.position.set(0, -0.06, 0.6)  // 在 bearing 后方（+Z），扇形朝外
+  arm.add(coilWedge)
+  // 线圈表面细环纹（5 圈同心，仿真铜线密绕）
+  for (let i = 0; i < 5; i++) {
+    const r1 = 0.45 + i * 0.065
+    const r2 = r1 + 0.015
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(r1, r2, 18, 1, -Math.PI / 4, Math.PI / 2),
+      new THREE.MeshStandardMaterial({ color: 0x7a4a1f, roughness: 0.5, metalness: 0.6 }),
+    )
+    ring.rotation.x = -Math.PI / 2
+    ring.position.set(0, -0.052, 0.6)
+    arm.add(ring)
+  }
+
+  // 永磁体上盖（黑色磁钢，立在线圈上方）—— 不随臂旋转，所以挂在 group 而非 arm
+  const magnetTop = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.12, 0.9), materials.aluminumDark)
+  magnetTop.position.set(1.4, 0.95, 2.0)  // 在 bearing(1.4,0.75,1.4) 之后偏 z +0.6 处
+  magnetTop.castShadow = true
+  group.add(magnetTop)
+  // 上磁极标识（"S 极"小标签，深红色细条）
+  const polTop = new THREE.Mesh(
+    new THREE.BoxGeometry(0.6, 0.005, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0xc54a3a, roughness: 0.7 }),
+  )
+  polTop.position.set(1.4, 1.011, 2.0)
+  group.add(polTop)
+
+  // 永磁体下盖（在 arm 平面以下，作为磁路另一极）
+  const magnetBot = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.08, 0.9), materials.aluminumDark)
+  magnetBot.position.set(1.4, 0.58, 2.0)
+  magnetBot.castShadow = true
+  group.add(magnetBot)
+
+  // 磁轭/磁路支柱（连接上下磁极的钢条，让磁场闭环 — 真 HDD 的标志性结构）
+  for (const yokeX of [1.4 - 0.45, 1.4 + 0.45]) {
+    const yoke = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.4, 0.16), materials.aluminumDark)
+    yoke.position.set(yokeX, 0.78, 2.42)  // 后方支柱
+    yoke.castShadow = true
+    group.add(yoke)
+  }
+
+  // VCM 工作指示 LED（活跃时亮，仿真线圈通电闪烁）
+  const vcmLedMat = makeLed(0xf0a020, 0.5)
+  const vcmLed = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 10), vcmLedMat)
+  vcmLed.position.set(1.4, 1.05, 2.4)
+  group.add(vcmLed)
+
   // 磁头柔性扁排线（从作动臂铰链拖到 SATA 接口一侧，仿真 HDD flex cable）
   const flexCurve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(1.4, 0.72, 1.4),    // 起点：作动臂铰链顶
@@ -138,6 +196,8 @@ export function buildDevice({ scene, materials, position }) {
     const targetAngle = -0.15 - (cs.bar || 0) * 0.7
     arm.rotation.y += (targetAngle - arm.rotation.y) * Math.min(1, dt * 4)
     rwMat.emissiveIntensity = cs.active ? 0.4 + 1.4 * Math.abs(Math.sin(t * 9)) : 0.2
+    // VCM 工作指示：寻道时（bar 变化）随线圈"通电"快速闪
+    vcmLedMat.emissiveIntensity = cs.active ? 0.3 + 1.2 * Math.abs(Math.sin(t * 12 + cs.bar * 4)) : 0.15
     led.mat.emissiveIntensity = ease(led.mat.emissiveIntensity, cs.active ? 2.4 : 0.35, dt, 6)
     div.innerHTML = `<b style="color:${cs.color}">${cs.title}</b><span>${cs.metric}</span><span>${cs.sub}</span>`
   }

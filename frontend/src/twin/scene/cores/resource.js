@@ -71,11 +71,12 @@ export function buildResource({ scene, materials, position }) {
   const R = 1.0
   const Y = 1.5
   const nodePos = []
+  const NODE_LABELS = ['P1', 'P2', 'P3']
   for (let i = 0; i < 3; i++) {
     const a = Math.PI / 2 + i * 2.094
     nodePos.push(new THREE.Vector3(Math.cos(a) * R, Y, Math.sin(a) * R - 0.2))
   }
-  nodePos.forEach((p) => {
+  nodePos.forEach((p, i) => {
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, p.y - 0.2, 8), materials.aluminumDark)
     post.position.set(p.x, p.y / 2 + 0.1, p.z)
     group.add(post)
@@ -84,6 +85,21 @@ export function buildResource({ scene, materials, position }) {
     node.position.copy(p)
     group.add(node)
     nodeMats.push(m)
+
+    // 进程标签贴纸（CanvasTexture 渲染 "P1/P2/P3" 文字 + 紫色底色，贴在节点正面）
+    const stickerTex = makeNodeStickerTexture(NODE_LABELS[i])
+    const stickerMat = new THREE.MeshStandardMaterial({
+      map: stickerTex,
+      transparent: true,
+      side: THREE.DoubleSide,
+      roughness: 0.7,
+      metalness: 0.0,
+    })
+    const sticker = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.18), stickerMat)
+    // 站在节点上方一点，朝向观察者（朝原点的方向）
+    sticker.position.set(p.x, p.y + 0.32, p.z)
+    sticker.lookAt(new THREE.Vector3(0, p.y + 0.32, -10))  // 朝向 -Z（默认视线方向）
+    group.add(sticker)
   })
   for (let i = 0; i < 3; i++) {
     const m = makeLed(0x8b5cf6, 0.6)
@@ -121,4 +137,33 @@ export function buildResource({ scene, materials, position }) {
   }
 
   return { group, update, focusOffset: new THREE.Vector3(0, 1.2, 0) }
+}
+
+/** 用 CanvasTexture 绘制节点进程标签（深紫底 + 白文字），返回 THREE.Texture */
+function makeNodeStickerTexture(label) {
+  const cv = document.createElement('canvas')
+  cv.width = 192
+  cv.height = 108
+  const ctx = cv.getContext('2d')
+  // 圆角矩形深紫底
+  ctx.fillStyle = 'rgba(46, 26, 86, 0.95)'
+  ctx.beginPath()
+  ctx.roundRect(4, 4, 184, 100, 14)
+  ctx.fill()
+  // 浅紫细边
+  ctx.strokeStyle = 'rgba(180, 150, 255, 0.6)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.roundRect(4, 4, 184, 100, 14)
+  ctx.stroke()
+  // 文字
+  ctx.fillStyle = '#e8d9ff'
+  ctx.font = 'bold 56px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(label, 96, 56)
+  const tex = new THREE.CanvasTexture(cv)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.anisotropy = 8
+  return tex
 }
