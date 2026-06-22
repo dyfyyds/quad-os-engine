@@ -76,6 +76,7 @@ def test_page_fault_blocks_before_cpu_progress():
         "performed": True, "result": "fault", "page": 0, "unit": 17,
     }
     assert state["gantt"] == [{"作业": "空闲", "开始": 0, "结束": 1}]
+    assert state["metrics"]["cpuUtil"] == 0
     assert any(event["type"] == "缺页中断" for event in events)
 
     twin_engine._load_page_after_disk_io(
@@ -85,6 +86,31 @@ def test_page_fault_blocks_before_cpu_progress():
     assert running["faults"] == 1
     assert state["memory"]["faults"] == 1
     assert running["pageTable"][0]["标志"] == 1
+
+
+@pytest.mark.parametrize(
+    ("clock", "gantt", "expected"),
+    [
+        (2, [{"作业": "空闲", "开始": 0, "结束": 2}], 0),
+        (2, [{"作业": "init", "开始": 0, "结束": 2}], 100),
+        (
+            4,
+            [
+                {"作业": "init", "开始": 0, "结束": 2},
+                {"作业": "空闲", "开始": 2, "结束": 4},
+            ],
+            50,
+        ),
+    ],
+)
+def test_cpu_utilization_excludes_idle_segments(clock, gantt, expected):
+    state = _load("twin_init.json")
+    state["clock"] = clock
+    state["gantt"] = gantt
+
+    twin_engine._recompute_runtime_metrics(state)
+
+    assert state["metrics"]["cpuUtil"] == expected
 
 
 def test_tick_reports_running_process_without_memory_access():
