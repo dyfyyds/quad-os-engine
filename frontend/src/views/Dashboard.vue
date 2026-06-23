@@ -5,46 +5,69 @@
       <p class="qos-page-sub">虚拟操作系统实时运行态 —— 四核心联动 · 点击顶部「运行」驱动模拟</p>
     </div>
 
-    <el-dialog v-model="guideVisible" title="快速开始" width="680px" @closed="markGuideSeen">
+    <el-dialog v-model="guideVisible" title="欢迎使用 Quad-OS" width="720px" :close-on-click-modal="false" @closed="markGuideSeen">
       <div class="guide-dialog">
-        <ol>
-          <li>选择一个实验场景，系统会帮你填入推荐输入。</li>
-          <li>在系统设置中点击“保存并查看”，进入对应核心页。</li>
-          <li>使用顶部“单步”观察每个时钟周期，或点击“运行”连续推进。</li>
-          <li>在核心页查看算法过程，在事件查询中追踪缺页、I/O、资源事件。</li>
-        </ol>
-        <div class="guide-actions">
-          <el-button v-for="exp in experiments" :key="exp.id" type="primary" plain @click="openExperiment(exp.id)">
-            <el-icon><component :is="exp.icon" /></el-icon>{{ exp.title }}
-          </el-button>
+        <p class="guide-intro">Quad-OS 是一个综合操作系统模拟平台，把处理机调度、存储管理、进程资源、设备管理整合为一个<strong>运行中的虚拟 OS</strong>。</p>
+        <div class="guide-flow">
+          <div class="guide-flow-item">
+            <div class="guide-flow-num">1</div>
+            <div class="guide-flow-body">
+              <b>选择实验场景</b>
+              <span>点击下方任一实验卡片，系统将自动加载经典输入数据和推荐参数。</span>
+            </div>
+          </div>
+          <div class="guide-flow-item">
+            <div class="guide-flow-num">2</div>
+            <div class="guide-flow-body">
+              <b>确认配置并进入核心页</b>
+              <span>在实验配置中心检查输入，点击「应用并前往」跳转到对应核心页面。</span>
+            </div>
+          </div>
+          <div class="guide-flow-item">
+            <div class="guide-flow-num">3</div>
+            <div class="guide-flow-body">
+              <b>运行模拟并观察</b>
+              <span>使用顶部「单步」逐周期观察算法过程，或点「运行」连续推进查看联动效果。</span>
+            </div>
+          </div>
+        </div>
+        <div class="guide-cards">
+          <div v-for="exp in experiments" :key="exp.id" class="guide-card" :style="{ '--card-color': exp.color }" @click="openExperiment(exp.id)">
+            <span class="guide-card-icon"><el-icon :size="18"><component :is="exp.icon" /></el-icon></span>
+            <span class="guide-card-title">{{ exp.title }}</span>
+            <span class="guide-card-desc">{{ exp.target.slice(0, 40) }}…</span>
+          </div>
         </div>
       </div>
+      <template #footer>
+        <el-checkbox v-model="dontShowAgain" style="float:left;margin-top:6px">不再显示</el-checkbox>
+        <el-button @click="guideVisible = false">关闭</el-button>
+      </template>
     </el-dialog>
 
-    <SectionCard title="快速开始" icon="Guide" style="margin-bottom: 14px;">
+    <SectionCard v-if="!quickStartCollapsed" title="快速开始" icon="Guide" style="margin-bottom: 14px;">
       <template #extra>
-        <el-link type="primary" @click="guideVisible = true">重新查看向导</el-link>
+        <el-button text size="small" @click="quickStartCollapsed = true">收起</el-button>
       </template>
       <div class="quick-start">
-        <div class="quick-step">
-          <b>1 选择实验</b>
-          <span>加载经典输入和预期结果。</span>
+        <div class="quick-steps">
+          <div class="quick-step"><b>1</b> 选择实验<span class="step-desc">加载经典输入</span></div>
+          <el-icon class="step-arrow"><ArrowRight /></el-icon>
+          <div class="quick-step"><b>2</b> 确认配置<span class="step-desc">进入核心页</span></div>
+          <el-icon class="step-arrow"><ArrowRight /></el-icon>
+          <div class="quick-step"><b>3</b> 运行观察<span class="step-desc">看联动效果</span></div>
         </div>
-        <div class="quick-step">
-          <b>2 保存配置</b>
-          <span>重建模拟并进入核心页。</span>
-        </div>
-        <div class="quick-step">
-          <b>3 运行观察</b>
-          <span>用单步看过程，用运行看联动。</span>
-        </div>
-        <div class="quick-experiments">
-          <el-button v-for="exp in experiments" :key="exp.id" :style="{ '--exp-color': exp.color }" @click="openExperiment(exp.id)">
-            <el-icon><component :is="exp.icon" /></el-icon>{{ exp.title }}
-          </el-button>
+        <div class="quick-cards">
+          <div v-for="exp in experiments" :key="exp.id" class="quick-card" :style="{ '--card-color': exp.color }" @click="openExperiment(exp.id)">
+            <span class="qc-icon"><el-icon><component :is="exp.icon" /></el-icon></span>
+            <span class="qc-title">{{ exp.title }}</span>
+          </div>
         </div>
       </div>
     </SectionCard>
+    <div v-else class="quick-collapsed" @click="quickStartCollapsed = false; guideVisible = true">
+      <el-icon><Guide /></el-icon> 需要帮助？点击展开快速开始或查看向导
+    </div>
 
     <!-- KPI -->
     <el-row :gutter="14" style="margin-bottom: 14px;">
@@ -148,6 +171,8 @@ const os = useOsStore()
 const router = useRouter()
 const experiments = EXPERIMENTS
 const guideVisible = ref(false)
+const quickStartCollapsed = ref(false)
+const dontShowAgain = ref(false)
 const GUIDE_KEY = 'quad-os-guide-seen'
 
 onMounted(() => {
@@ -157,7 +182,9 @@ onMounted(() => {
 })
 
 function markGuideSeen() {
-  if (typeof window !== 'undefined') window.localStorage.setItem(GUIDE_KEY, '1')
+  if (typeof window !== 'undefined') {
+    if (dontShowAgain.value) window.localStorage.setItem(GUIDE_KEY, '1')
+  }
 }
 
 function openExperiment(id) {
@@ -207,14 +234,36 @@ const coreCards = computed(() => {
 
 <style scoped>
 .core-health { display: flex; flex-direction: column; gap: 14px; padding: 4px 0; }
-.guide-dialog ol { margin: 0; padding-left: 20px; color: #5b6776; line-height: 1.9; }
-.guide-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
-.quick-start { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 12px; align-items: stretch; }
-.quick-step { border: 1px solid #e8eef5; border-radius: 8px; padding: 10px 12px; background: #f8fafc; }
-.quick-step b { display: block; color: var(--qos-text); font-size: 13px; margin-bottom: 4px; }
-.quick-step span { color: var(--qos-muted); font-size: 12px; }
-.quick-experiments { display: flex; flex-direction: column; gap: 8px; min-width: 150px; }
-.quick-experiments .el-button { justify-content: flex-start; margin-left: 0; border-color: var(--exp-color); color: var(--exp-color); }
+
+/* —— 弹窗引导 —— */
+.guide-intro { color: #5b6776; font-size: 13px; margin: 0 0 18px; line-height: 1.7; }
+.guide-flow { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+.guide-flow-item { display: flex; gap: 12px; align-items: flex-start; }
+.guide-flow-num { width: 28px; height: 28px; border-radius: 50%; background: var(--qos-accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.guide-flow-body b { display: block; font-size: 13px; color: var(--qos-text); margin-bottom: 2px; }
+.guide-flow-body span { font-size: 12px; color: var(--qos-muted); line-height: 1.5; }
+.guide-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.guide-card { border: 1.5px solid #e8eef5; border-radius: 10px; padding: 14px; cursor: pointer; transition: all .18s; display: flex; flex-direction: column; gap: 6px; }
+.guide-card:hover { border-color: var(--card-color); background: color-mix(in srgb, var(--card-color) 6%, #fff); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.guide-card-icon { color: var(--card-color); }
+.guide-card-title { font-size: 13px; font-weight: 600; color: var(--qos-text); }
+.guide-card-desc { font-size: 11px; color: var(--qos-muted); line-height: 1.4; }
+
+/* —— 快速开始区块 —— */
+.quick-start { display: flex; flex-direction: column; gap: 14px; }
+.quick-steps { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.quick-step { display: flex; align-items: center; gap: 6px; background: #f8fafc; border: 1px solid #e8eef5; border-radius: 8px; padding: 8px 14px; font-size: 13px; color: var(--qos-text); }
+.quick-step b { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--qos-accent); color: #fff; font-size: 11px; flex-shrink: 0; }
+.step-desc { font-size: 11px; color: var(--qos-muted); margin-left: 4px; }
+.step-arrow { color: #cdd5e3; font-size: 14px; }
+.quick-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.quick-card { display: flex; align-items: center; gap: 8px; border: 1.5px solid #e8eef5; border-radius: 8px; padding: 10px 14px; cursor: pointer; transition: all .15s; }
+.quick-card:hover { border-color: var(--card-color); background: color-mix(in srgb, var(--card-color) 5%, #fff); }
+.qc-icon { color: var(--card-color); font-size: 16px; display: flex; }
+.qc-title { font-size: 13px; font-weight: 600; color: var(--qos-text); }
+.quick-collapsed { text-align: center; padding: 10px; margin-bottom: 14px; background: #f8fafc; border: 1px dashed #d3dce5; border-radius: 8px; color: var(--qos-muted); font-size: 12px; cursor: pointer; transition: all .15s; }
+.quick-collapsed:hover { border-color: var(--qos-accent); color: var(--qos-accent); }
+
 .ch-row { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
 .ch-row .ch-name { width: 46px; color: #5b6776; }
 .snap { list-style: none; margin: 0; padding: 0; }
