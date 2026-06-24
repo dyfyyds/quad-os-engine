@@ -46,6 +46,45 @@
         <el-button size="small" @click="driver.reset(true)"><el-icon><RefreshLeft /></el-icon></el-button>
       </el-tooltip>
     </el-button-group>
+
+    <el-tooltip content="将当前仿真状态作为快照保存到数据库" placement="bottom">
+      <el-button type="success" size="small" @click="saveCurrentSnapshot">
+        <el-icon><FolderAdd /></el-icon> 保存快照
+      </el-button>
+    </el-tooltip>
+
+    <el-select
+      v-model="selectedScenarioId"
+      placeholder="加载快照"
+      size="small"
+      style="width: 130px"
+      @change="loadScenario"
+      @visible-change="onVisibleChange"
+      :loading="loadingScenarios"
+    >
+      <el-option
+        v-for="item in scenarioList"
+        :key="item.id"
+        :label="item.name"
+        :value="item.id"
+      >
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+          <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px;">
+            {{ item.name }}
+          </span>
+          <el-button
+            type="danger"
+            link
+            size="small"
+            style="padding: 0 4px; height: auto;"
+            @click.stop="deleteSnapshot(item.id)"
+          >
+            <el-icon><Delete /></el-icon>
+          </el-button>
+        </div>
+      </el-option>
+    </el-select>
+
     <el-tooltip content="调整自动运行速度" placement="bottom">
       <el-select v-model="speed" size="small" style="width: 92px" @change="driver.setSpeed(speed)">
         <el-option v-for="s in speeds" :key="s" :label="s + 'x'" :value="s" />
@@ -55,14 +94,105 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useOsStore } from '../../store/os'
 import { useOsDriver } from '../../mock/driver'
+import { api } from '../../api/client'
+import { serializeSim, applySim } from '../../mock/localTick'
 
 const os = useOsStore()
 const driver = useOsDriver()
 const speeds = [0.5, 1, 2, 4]
 const speed = ref(os.speed)
+
+const selectedScenarioId = ref(null)
+const scenarioList = ref([])
+const loadingScenarios = ref(false)
+
+const fetchScenarios = async () => {
+  loadingScenarios.value = true
+  try {
+    const list = await api.listScenarios('twin')
+    scenarioList.value = list
+  } catch (e) {
+    ElMessage.error('获取快照列表失败: ' + e.message)
+  } finally {
+    loadingScenarios.value = false
+  }
+}
+
+const onVisibleChange = (visible) => {
+  if (visible) {
+    fetchScenarios()
+  }
+}
+
+const saveCurrentSnapshot = async () => {
+  try {
+    const { value: name } = await ElMessageBox.prompt('请输入快照名称', '保存状态快照', {
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputPlaceholder: '如：运行中 - 死锁边缘',
+      inputPattern: /\S+/,
+      inputErrorMessage: '快照名称不能为空',
+    })
+    
+    if (!name) return
+
+    const snapshot = serializeSim(os.$state)
+    await api.saveScenario({
+      module: 'twin',
+      name: name,
+      description: 'Twin Engine State Snapshot',
+      input: snapshot,
+    })
+    ElMessage.success('快照保存成功')
+    fetchScenarios()
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error('保存快照失败: ' + (e?.message || e))
+    }
+  }
+}
+
+const loadScenario = async (sid) => {
+  if (!sid) return
+  const scenario = scenarioList.value.find((s) => s.id === sid)
+  if (scenario) {
+    try {
+      driver.pause()
+      applySim(os.$state, scenario.input)
+      os.pushEvent('状态恢复', 'system', 'info', `已成功从数据库加载状态快照 "${scenario.name}"`)
+      ElMessage.success(`成功载入快照: ${scenario.name}`)
+    } catch (e) {
+      ElMessage.error('加载快照失败: ' + e.message)
+    } finally {
+      selectedScenarioId.value = null
+    }
+  }
+}
+
+const deleteSnapshot = async (id) => {
+  try {
+    await ElMessageBox.confirm('确定要删除此状态快照吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    await api.deleteScenario(id)
+    ElMessage.success('快照已删除')
+    fetchScenarios()
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error('删除快照失败: ' + (e?.message || e))
+    }
+  }
+}
+
+onMounted(() => {
+  fetchScenarios()
+})
 
 const currentProc = computed(() => os.runningProc?.name || '空闲')
 const recentEvent = computed(() => os.events[0] || null)

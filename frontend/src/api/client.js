@@ -32,6 +32,16 @@ async function put(path, body) {
   return r.json()
 }
 
+async function del(path) {
+  const r = await fetch(path, { method: 'DELETE' })
+  if (!r.ok) {
+    let detail = r.statusText
+    try { detail = (await r.json()).detail || detail } catch (e) { /* ignore */ }
+    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
+  }
+  return r.json()
+}
+
 export const api = {
   scheduling: (b) => post('/api/scheduling/run', b),
   disk: (b) => post('/api/disk/run', b),
@@ -46,6 +56,7 @@ export const api = {
   reportMarkdown: (trace) => post('/api/report/markdown', trace),
   saveScenario: (b) => post('/api/scenarios', b),
   listScenarios: (m) => get('/api/scenarios?module=' + m),
+  deleteScenario: (sid) => del('/api/scenarios/' + sid),
   recordHistory: (b) => post('/api/history', b),
   getConfig: () => get('/api/config'),
   putConfig: (config) => put('/api/config', { config }),

@@ -661,7 +661,7 @@ function serveDisk(state, push) {
   }
 
   const req = d.queue[chosenIdx]
-  const serviceTime = Math.max(2, Math.round(seek / 10) + 1)
+  const serviceTime = Math.round(seek / 50) + 1
 
   const oldHead = d.head
   d.head = req.柱面号
