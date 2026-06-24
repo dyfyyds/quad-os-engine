@@ -627,7 +627,7 @@ def _serve_disk(state, push):
         seek = abs(q[chosen_idx]["柱面号"] - head)
 
     req = q[chosen_idx]
-    service_time = max(2, _round(seek / 10) + 1)
+    service_time =  _round(seek / 50) + 1
 
     old_head = d["head"]
     d["head"] = req["柱面号"]
