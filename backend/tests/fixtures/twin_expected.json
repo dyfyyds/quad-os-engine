@@ -973,7 +973,7 @@
           53,
           65
         ],
-        "totalSeek": 0,
+        "totalSeek": 12,
         "served": 0,
         "servedLog": [],
         "busyUntil": 3,
@@ -2171,7 +2171,7 @@
           53,
           65
         ],
-        "totalSeek": 0,
+        "totalSeek": 12,
         "served": 0,
         "servedLog": [],
         "busyUntil": 3,
@@ -3365,7 +3365,7 @@
           65,
           67
         ],
-        "totalSeek": 0,
+        "totalSeek": 14,
         "served": 1,
         "servedLog": [
           {
@@ -4626,7 +4626,7 @@
           65,
           67
         ],
-        "totalSeek": 0,
+        "totalSeek": 14,
         "served": 1,
         "servedLog": [
           {
@@ -5868,7 +5868,7 @@
           67,
           98
         ],
-        "totalSeek": 0,
+        "totalSeek": 45,
         "served": 2,
         "servedLog": [
           {
@@ -7165,7 +7165,7 @@
           67,
           98
         ],
-        "totalSeek": 0,
+        "totalSeek": 45,
         "served": 2,
         "servedLog": [
           {
@@ -8585,7 +8585,7 @@
           67,
           98
         ],
-        "totalSeek": 0,
+        "totalSeek": 45,
         "served": 2,
         "servedLog": [
           {
@@ -10017,7 +10017,7 @@
           67,
           98
         ],
-        "totalSeek": 0,
+        "totalSeek": 45,
         "served": 2,
         "servedLog": [
           {
@@ -11441,7 +11441,7 @@
           98,
           122
         ],
-        "totalSeek": 0,
+        "totalSeek": 69,
         "served": 3,
         "servedLog": [
           {
@@ -12922,7 +12922,7 @@
           98,
           122
         ],
-        "totalSeek": 0,
+        "totalSeek": 69,
         "served": 3,
         "servedLog": [
           {
@@ -14382,7 +14382,7 @@
           98,
           122
         ],
-        "totalSeek": 0,
+        "totalSeek": 69,
         "served": 3,
         "servedLog": [
           {
@@ -15861,7 +15861,7 @@
           122,
           124
         ],
-        "totalSeek": 0,
+        "totalSeek": 71,
         "served": 4,
         "servedLog": [
           {
@@ -17367,7 +17367,7 @@
           122,
           124
         ],
-        "totalSeek": 0,
+        "totalSeek": 71,
         "served": 4,
         "servedLog": [
           {
@@ -19007,7 +19007,7 @@
           124,
           183
         ],
-        "totalSeek": 0,
+        "totalSeek": 130,
         "served": 5,
         "servedLog": [
           {
@@ -20690,7 +20690,7 @@
           124,
           183
         ],
-        "totalSeek": 0,
+        "totalSeek": 130,
         "served": 5,
         "servedLog": [
           {
@@ -22377,7 +22377,7 @@
           124,
           183
         ],
-        "totalSeek": 0,
+        "totalSeek": 130,
         "served": 5,
         "servedLog": [
           {
@@ -24053,7 +24053,7 @@
           124,
           183
         ],
-        "totalSeek": 0,
+        "totalSeek": 130,
         "served": 5,
         "servedLog": [
           {
@@ -25716,7 +25716,7 @@
           124,
           183
         ],
-        "totalSeek": 0,
+        "totalSeek": 130,
         "served": 5,
         "servedLog": [
           {
@@ -27379,7 +27379,7 @@
           124,
           183
         ],
-        "totalSeek": 0,
+        "totalSeek": 130,
         "served": 5,
         "servedLog": [
           {
@@ -29042,7 +29042,7 @@
           124,
           183
         ],
-        "totalSeek": 0,
+        "totalSeek": 130,
         "served": 5,
         "servedLog": [
           {
@@ -30848,7 +30848,7 @@
           183,
           93
         ],
-        "totalSeek": 0,
+        "totalSeek": 252,
         "served": 6,
         "servedLog": [
           {
@@ -32708,7 +32708,7 @@
           183,
           93
         ],
-        "totalSeek": 0,
+        "totalSeek": 252,
         "served": 6,
         "servedLog": [
           {
@@ -34537,7 +34537,7 @@
           183,
           93
         ],
-        "totalSeek": 0,
+        "totalSeek": 252,
         "served": 6,
         "servedLog": [
           {
@@ -36360,7 +36360,7 @@
           183,
           93
         ],
-        "totalSeek": 0,
+        "totalSeek": 252,
         "served": 6,
         "servedLog": [
           {
@@ -38183,7 +38183,7 @@
           183,
           93
         ],
-        "totalSeek": 0,
+        "totalSeek": 252,
         "served": 6,
         "servedLog": [
           {
@@ -40000,7 +40000,7 @@
           183,
           93
         ],
-        "totalSeek": 0,
+        "totalSeek": 252,
         "served": 6,
         "servedLog": [
           {
@@ -41817,7 +41817,7 @@
           183,
           93
         ],
-        "totalSeek": 0,
+        "totalSeek": 252,
         "served": 6,
         "servedLog": [
           {
@@ -43788,7 +43788,7 @@
           183,
           93
         ],
-        "totalSeek": 0,
+        "totalSeek": 252,
         "served": 6,
         "servedLog": [
           {
@@ -45779,7 +45779,7 @@
           183,
           93
         ],
-        "totalSeek": 0,
+        "totalSeek": 252,
         "served": 6,
         "servedLog": [
           {
@@ -47751,7 +47751,7 @@
           183,
           93
         ],
-        "totalSeek": 0,
+        "totalSeek": 252,
         "served": 6,
         "servedLog": [
           {

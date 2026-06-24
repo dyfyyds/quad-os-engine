@@ -672,6 +672,7 @@ function serveDisk(state, push) {
   }
   d.path.push(d.head)
   if (d.path.length > 30) d.path.shift()
+  d.totalSeek = (d.totalSeek || 0) + seek
 
   d.activeRequest = {
     ...req, seek, serviceTime,
