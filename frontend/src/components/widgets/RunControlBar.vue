@@ -140,7 +140,11 @@ const saveCurrentSnapshot = async () => {
     
     if (!name) return
 
-    const snapshot = serializeSim(os.$state)
+    const snapshot = {
+      ...serializeSim(os.$state),
+      history: JSON.parse(JSON.stringify(os.history)),
+      events: JSON.parse(JSON.stringify(os.events)),
+    }
     await api.saveScenario({
       module: 'twin',
       name: name,
@@ -163,6 +167,12 @@ const loadScenario = async (sid) => {
     try {
       driver.pause()
       applySim(os.$state, scenario.input)
+      if (scenario.input.history) {
+        os.history = JSON.parse(JSON.stringify(scenario.input.history))
+      }
+      if (scenario.input.events) {
+        os.events = JSON.parse(JSON.stringify(scenario.input.events))
+      }
       os.pushEvent('状态恢复', 'system', 'info', `已成功从数据库加载状态快照 "${scenario.name}"`)
       ElMessage.success(`成功载入快照: ${scenario.name}`)
     } catch (e) {
