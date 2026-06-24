@@ -639,6 +639,7 @@ def _serve_disk(state, push):
     if len(d["path"]) > 30:
         d["path"].pop(0)
 
+    d["totalSeek"] = d.get("totalSeek", 0) + seek
     d["activeRequest"] = {
         **req, "seek": seek, "serviceTime": service_time,
         "startTime": state["clock"], "finishTime": state["clock"] + service_time,
